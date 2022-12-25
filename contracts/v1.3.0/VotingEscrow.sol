@@ -1,11 +1,3 @@
-/**
- *Submitted for verification at FtmScan.com on 2022-11-28
-*/
-
-/**
- *Submitted for verification at FtmScan.com on 2022-11-13
-*/
-
 // File: contracts/interfaces/IVeArtProxy.sol
 
 
@@ -761,7 +753,8 @@ contract VotingEscrow is Initializable, IERC721Upgradeable, IERC721MetadataUpgra
         CREATE_LOCK_TYPE,
         INCREASE_LOCK_AMOUNT,
         INCREASE_UNLOCK_TIME,
-        MERGE_TYPE
+        MERGE_TYPE,
+        SPLIT_TYPE
     }
 
     struct LockedBalance {
@@ -1472,7 +1465,7 @@ contract VotingEscrow is Initializable, IERC721Upgradeable, IERC721MetadataUpgra
         _checkpoint(_tokenId, old_locked, __locked);
 
         address from = msg.sender;
-        if (_value != 0 && deposit_type != DepositType.MERGE_TYPE) {
+        if (_value != 0 && deposit_type != DepositType.MERGE_TYPE && deposit_type != DepositType.SPLIT_TYPE ) {
             assert(IERC20(token).transferFrom(from, address(this), _value));
         }
         emit Deposit(from, _tokenId, _value, __locked.end, deposit_type, block.timestamp);
@@ -1823,6 +1816,56 @@ contract VotingEscrow is Initializable, IERC721Upgradeable, IERC721MetadataUpgra
         _checkpoint(_from, _locked0, LockedBalance(0, 0));
         _burn(_from);
         _deposit_for(_to, value0, end, _locked1, DepositType.MERGE_TYPE);
+    }
+    
+    /**
+     * @notice split NFT into multiple
+     * @param amounts   % of split
+     * @param _tokenId  NFTs ID
+     */
+    function split(uint[] memory amounts, uint _tokenId) external {
+        
+        // check permission and vote
+        require(attachments[_tokenId] == 0 && !voted[_tokenId], "attached");
+        require(_isApprovedOrOwner(msg.sender, _tokenId));
+
+        // save old data and totalWeight
+        address _to = idToOwner[_tokenId];
+        LockedBalance memory __locked = locked[_tokenId];
+        uint end = __locked.end;
+        uint value = uint(int256(__locked.amount));
+
+        uint i;
+        uint totalWeight = 0;
+        for(i = 0; i < amounts.length; i++){
+            totalWeight += amounts[i];
+        }
+        require(totalWeight > 1, "Death Split Forbidden!");
+
+        // remove old data
+        _supply = supply;
+        supply = _supply - value;
+        locked[_tokenId] = LockedBalance(0, 0);
+        _checkpoint(_tokenId, __locked, LockedBalance(0, 0));
+        _burn(_tokenId);
+
+        // save end
+        uint unlock_time = end;
+        require(unlock_time > block.timestamp, 'Can only lock for the future');
+        require(unlock_time <= block.timestamp + MAXTIME, 'Voting lock can only be less than max');
+        
+        // mint 
+        uint _value = 0;
+        for(i = 0; i < amounts.length; i++){   
+            ++tokenId;
+            _tokenId = tokenId;
+            _mint(_to, _tokenId);
+            _value = value * amounts[i] / totalWeight;
+            // Preserve Minimum-viable Non-Fungibility
+            require( _value > _supply/1337, "Too Fungible!"); // Min: 0.15% / 2
+            _deposit_for(_tokenId, _value, unlock_time, locked[_tokenId], DepositType.SPLIT_TYPE);
+        }     
+
     }
 
     /*///////////////////////////////////////////////////////////////

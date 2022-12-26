@@ -1,10 +1,37 @@
 /**
+ *v1.2.0
+ *0x6bF6A6185afE3cc88707b0b6474F6AFceE59EFED
  *Submitted for verification at FtmScan.com on 2022-11-28
 */
 
-/**
+/**v1.1.0
+ *0xB171D9126d01E6DDb76Df8dd30e3A0C712f2cF5c
  *Submitted for verification at FtmScan.com on 2022-11-09
 */
+
+
+
+
+/**
+ *  EQUALIZER EXCHANGE
+ *  The New Liquidity Hub of Fantom chain!
+ *  https://equalizer.exchange  (Dapp)
+ *  https://discord.gg/MaMhbgHMby   (Community)
+ *
+ *
+ *  Version: 1.3.0
+ *  - Depreciate usage of poke()
+ *
+ *
+ *  Contributors:
+ *   -   Andre Cronje, Solidly.Exchange
+ *   -   Velodrome.finance Team
+ *   -   @smartcoding51
+ *   -   Sam 543#3017, Equalizer Team
+ *      
+*/
+
+
 
 // File: contracts/interfaces/IVotingEscrow.sol
 
@@ -676,16 +703,21 @@ contract Voter is Initializable {
     }
 
     function poke(uint _tokenId) external {
-        require(IVotingEscrow(_ve).isApprovedOrOwner(msg.sender, _tokenId), "Neither approved nor owner");
-        address[] memory _poolVote = poolVote[_tokenId];
-        uint _poolCnt = _poolVote.length;
-        uint256[] memory _weights = new uint256[](_poolCnt);
+        /// Poke function was depreciated in v1.3.0 due to security reasons.
+        /// Its still callable for backwards compatibility, but does nothing.
+        /// Usage allowed by ms (Official Equălizer Team Multi-Sig)
+        if(msg.sender == ms) {
+            address[] memory _poolVote = poolVote[_tokenId];
+            uint _poolCnt = _poolVote.length;
+            uint256[] memory _weights = new uint256[](_poolCnt);
 
-        for (uint i = 0; i < _poolCnt; i ++) {
-            _weights[i] = votes[_tokenId][_poolVote[i]];
+            for (uint i = 0; i < _poolCnt; i ++) {
+                _weights[i] = votes[_tokenId][_poolVote[i]];
+            }
+
+            _vote(_tokenId, _poolVote, _weights);
         }
-
-        _vote(_tokenId, _poolVote, _weights);
+        /// else return;
     }
 
     function _vote(uint _tokenId, address[] memory _poolVote, uint256[] memory _weights) internal {

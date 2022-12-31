@@ -755,6 +755,7 @@ contract ExternalBribe is Initializable {
     // This is an external function, but internal notation is used since it can only be called "internally" from Gauges
     function _deposit(uint amount, uint tokenId) external {
         require(msg.sender == voter, "Not voter");
+        require(amount > 0, "Zero amount");
 
         totalSupply += amount;
         balanceOf[tokenId] += amount;

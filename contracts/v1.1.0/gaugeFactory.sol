@@ -1,48 +1,14 @@
-/**v1.0.0
- *0x8868ae6De5e723e6840Cdc21370e415bF5123684
+/**
  *Submitted for verification at FtmScan.com on 2022-11-04
 */
 
-
-
-/**
- *  EQUALIZER EXCHANGE
- *  The New Liquidity Hub of Fantom chain!
- *  https://equalizer.exchange  (Dapp)
- *  https://discord.gg/MaMhbgHMby   (Community)
- *
- *
- *  Version: 1.4.0
- *  - Remove the whole concept of Internal Bribes (Trade Fees Streamer), Unify.
- *  - Prevent breaking of rewards in earned() from reading 0-supply checkpoints
- *  - Voter.team() can siphon out unclaimed rewards.
- *    - This contract does not take or allow deposits of any user funds.
- *    - Only the Bribes can be rescue()'d.
- *
- *
- *  Contributors:
- *   -   Andre Cronje, Solidly.Exchange
- *   -   Team, Velodrome.finance
- *   -   @smartcoding51, Equalizer.exchange
- *   -   Sam 543#3017, ftm.guru & Equalizer.exchange
- *
- *
- *	SPDX-License-Identifier: UNLICENSED
-*/
-
-
-
-// File: contracts/interfaces/IGauge.sol
+// File: contracts/interfaces/IGaugeFactory.sol
 
 
 pragma solidity 0.8.9;
 
-interface IGauge {
-    function notifyRewardAmount(address token, uint amount) external;
-    function getReward(address account, address[] memory tokens) external;
-    function claimFees() external returns (uint claimed0, uint claimed1);
-    function left(address token) external view returns (uint);
-    function isForPair() external view returns (bool);
+interface IGaugeFactory {
+    function createGauge(address, address, address, address, bool, address[] memory) external returns (address);
 }
 
 // File: contracts/interfaces/IVotingEscrow.sol
@@ -100,6 +66,24 @@ interface IVoter {
     function notifyRewardAmount(uint amount) external;
     function distribute(address _gauge) external;
 }
+// File: contracts/interfaces/IPair.sol
+
+
+pragma solidity 0.8.9;
+
+interface IPair {
+    function metadata() external view returns (uint dec0, uint dec1, uint r0, uint r1, bool st, address t0, address t1);
+    function claimFees() external returns (uint, uint);
+    function tokens() external returns (address, address);
+    function transferFrom(address src, address dst, uint amount) external returns (bool);
+    function permit(address owner, address spender, uint value, uint deadline, uint8 v, bytes32 r, bytes32 s) external;
+    function swap(uint amount0Out, uint amount1Out, address to, bytes calldata data) external;
+    function burn(address to) external returns (uint amount0, uint amount1);
+    function mint(address to) external returns (uint liquidity);
+    function getReserves() external view returns (uint _reserve0, uint _reserve1, uint _blockTimestampLast);
+    function getAmountOut(uint, address) external view returns (uint);
+}
+
 // File: contracts/interfaces/IERC20.sol
 
 
@@ -117,6 +101,19 @@ interface IERC20 {
 
     event Transfer(address indexed from, address indexed to, uint value);
     event Approval(address indexed owner, address indexed spender, uint value);
+}
+
+// File: contracts/interfaces/IBribe.sol
+
+
+pragma solidity 0.8.9;
+
+interface IBribe {
+    function _deposit(uint amount, uint tokenId) external;
+    function _withdraw(uint amount, uint tokenId) external;
+    function getRewardForOwner(uint tokenId, address[] memory tokens) external;
+    function notifyRewardAmount(address token, uint amount) external;
+    function left(address token) external view returns (uint);
 }
 
 // File: contracts/libraries/Math.sol
@@ -495,7 +492,7 @@ abstract contract Initializable {
     }
 }
 
-// File: contracts/ExternalBribe.sol
+// File: contracts/Gauge.sol
 
 
 pragma solidity 0.8.9;
@@ -506,17 +503,23 @@ pragma solidity 0.8.9;
 
 
 
+
 /**
- * @notice Bribes pay out rewards for a given pool based on the votes that were received from the user
- * goes hand in hand with Voter.vote()
+ * @notice Gauges are used to incentivize pools, they emit reward tokens over 7 days for staked LP tokens
  */
 
-contract ExternalBribe is Initializable {
+contract Gauge is Initializable {
 
-    /// @notice A checkpoint for marking balance
+     /// @notice A checkpoint for marking balance
     struct Checkpoint {
         uint timestamp;
         uint balanceOf;
+    }
+
+    /// @notice A checkpoint for marking reward rate
+    struct RewardPerTokenCheckpoint {
+        uint timestamp;
+        uint rewardPerToken;
     }
 
     /// @notice A checkpoint for marking supply
@@ -525,36 +528,61 @@ contract ExternalBribe is Initializable {
         uint supply;
     }
 
-    address public voter; // only voter can modify balances (since it only happens on vote())
-    address public _ve;
+    address public stake; // the LP token that needs to be staked for rewards
+    address public _ve; // the ve token used for gauges
+    address public internal_bribe;
+    address public external_bribe;
+    address public voter;
 
-    uint internal constant DURATION = 7 days; // rewards are released over the voting period
+    uint public derivedSupply;
+    mapping(address => uint) public derivedBalances;
+
+    bool public isForPair;
+
+    uint internal constant DURATION = 7 days; // rewards are released over 7 days
+    uint internal constant PRECISION = 10 ** 18;
     uint internal constant MAX_REWARD_TOKENS = 16;
 
-    uint internal constant PRECISION = 10 ** 18;
+    // default snx staking contract implementation
+    mapping(address => uint) public rewardRate;
+    mapping(address => uint) public periodFinish;
+    mapping(address => uint) public lastUpdateTime;
+    mapping(address => uint) public rewardPerTokenStored;
+
+    mapping(address => mapping(address => uint)) public lastEarn;
+    mapping(address => mapping(address => uint)) public userRewardPerTokenStored;
+
+    mapping(address => uint) public tokenIds;
 
     uint public totalSupply;
-    mapping(uint => uint) public balanceOf;
-    mapping(address => mapping(uint => uint)) public tokenRewardsPerEpoch;
-    mapping(address => uint) public periodFinish;
-    mapping(address => mapping(uint => uint)) public lastEarn;
+    mapping(address => uint) public balanceOf;
 
     address[] public rewards;
     mapping(address => bool) public isReward;
+
     /// @notice A record of balance checkpoints for each account, by index
-    mapping (uint => mapping (uint => Checkpoint)) public checkpoints;
+    mapping (address => mapping (uint => Checkpoint)) public checkpoints;
     /// @notice The number of checkpoints for each account
-    mapping (uint => uint) public numCheckpoints;
+    mapping (address => uint) public numCheckpoints;
     /// @notice A record of balance checkpoints for each token, by index
     mapping (uint => SupplyCheckpoint) public supplyCheckpoints;
     /// @notice The number of checkpoints
     uint public supplyNumCheckpoints;
+    /// @notice A record of balance checkpoints for each token, by index
+    mapping (address => mapping (uint => RewardPerTokenCheckpoint)) public rewardPerTokenCheckpoints;
+    /// @notice The number of checkpoints for each token
+    mapping (address => uint) public rewardPerTokenNumCheckpoints;
+
+    uint public fees0;
+    uint public fees1;
+
     /// @notice simple re-entrancy check
     bool internal _locked;
 
     event Deposit(address indexed from, uint tokenId, uint amount);
     event Withdraw(address indexed from, uint tokenId, uint amount);
-    event NotifyReward(address indexed from, address indexed reward, uint epoch, uint amount);
+    event NotifyReward(address indexed from, address indexed reward, uint amount);
+    event ClaimFees(address indexed from, uint claimed0, uint claimed1);
     event ClaimRewards(address indexed from, address indexed reward, uint amount);
 
     modifier lock() {
@@ -564,9 +592,21 @@ contract ExternalBribe is Initializable {
         _locked = false;
     }
 
-    function initialize(address _voter, address[] memory _allowedRewardTokens) public initializer {
+    function initialize(
+        address _stake,
+        address _internal_bribe,
+        address _external_bribe,
+        address  __ve,
+        address _voter,
+        bool _forPair,
+        address[] memory _allowedRewardTokens
+    ) public initializer {
+        stake = _stake;
+        internal_bribe = _internal_bribe;
+        external_bribe = _external_bribe;
+        _ve = __ve;
         voter = _voter;
-        _ve = IVoter(_voter)._ve();
+        isForPair = _forPair;
 
         for (uint i; i < _allowedRewardTokens.length; i++) {
             if (_allowedRewardTokens[i] != address(0)) {
@@ -576,34 +616,58 @@ contract ExternalBribe is Initializable {
         }
     }
 
-    function _bribeStart(uint timestamp) internal pure returns (uint) {
-        return timestamp - (timestamp % (7 days));
+    function claimFees() external lock returns (uint claimed0, uint claimed1) {
+        return _claimFees();
     }
 
-    function getEpochStart(uint timestamp) public pure returns (uint) {
-        uint bribeStart = _bribeStart(timestamp);
-        uint bribeEnd = bribeStart + DURATION;
-        return timestamp < bribeEnd ? bribeStart : bribeStart + 7 days;
+    function _claimFees() internal returns (uint claimed0, uint claimed1) {
+        if (!isForPair) {
+            return (0, 0);
+        }
+        (claimed0, claimed1) = IPair(stake).claimFees();
+        if (claimed0 > 0 || claimed1 > 0) {
+            uint _fees0 = fees0 + claimed0;
+            uint _fees1 = fees1 + claimed1;
+            (address _token0, address _token1) = IPair(stake).tokens();
+            if (_fees0 > IBribe(internal_bribe).left(_token0) && _fees0 / DURATION > 0) {
+                fees0 = 0;
+                _safeApprove(_token0, internal_bribe, _fees0);
+                IBribe(internal_bribe).notifyRewardAmount(_token0, _fees0);
+            } else {
+                fees0 = _fees0;
+            }
+            if (_fees1 > IBribe(internal_bribe).left(_token1) && _fees1 / DURATION > 0) {
+                fees1 = 0;
+                _safeApprove(_token1, internal_bribe, _fees1);
+                IBribe(internal_bribe).notifyRewardAmount(_token1, _fees1);
+            } else {
+                fees1 = _fees1;
+            }
+
+            emit ClaimFees(msg.sender, claimed0, claimed1);
+        }
     }
 
     /**
     * @notice Determine the prior balance for an account as of a block number
     * @dev Block number must be a finalized block or else this function will revert to prevent misinformation.
-    * @param tokenId The token of the NFT to check
+    * @param account The address of the account to check
     * @param timestamp The timestamp to get the balance at
     * @return The balance the account had as of the given block
     */
-    function getPriorBalanceIndex(uint tokenId, uint timestamp) public view returns (uint) {
-        uint nCheckpoints = numCheckpoints[tokenId];
+    function getPriorBalanceIndex(address account, uint timestamp) public view returns (uint) {
+        uint nCheckpoints = numCheckpoints[account];
         if (nCheckpoints == 0) {
             return 0;
         }
+
         // First check most recent balance
-        if (checkpoints[tokenId][nCheckpoints - 1].timestamp <= timestamp) {
+        if (checkpoints[account][nCheckpoints - 1].timestamp <= timestamp) {
             return (nCheckpoints - 1);
         }
+
         // Next check implicit zero balance
-        if (checkpoints[tokenId][0].timestamp > timestamp) {
+        if (checkpoints[account][0].timestamp > timestamp) {
             return 0;
         }
 
@@ -611,7 +675,7 @@ contract ExternalBribe is Initializable {
         uint upper = nCheckpoints - 1;
         while (upper > lower) {
             uint center = upper - (upper - lower) / 2; // ceil, avoiding overflow
-            Checkpoint memory cp = checkpoints[tokenId][center];
+            Checkpoint memory cp = checkpoints[account][center];
             if (cp.timestamp == timestamp) {
                 return center;
             } else if (cp.timestamp < timestamp) {
@@ -655,14 +719,58 @@ contract ExternalBribe is Initializable {
         return lower;
     }
 
-    function _writeCheckpoint(uint tokenId, uint balance) internal {
+    function getPriorRewardPerToken(address token, uint timestamp) public view returns (uint, uint) {
+        uint nCheckpoints = rewardPerTokenNumCheckpoints[token];
+        if (nCheckpoints == 0) {
+            return (0,0);
+        }
+
+        // First check most recent balance
+        if (rewardPerTokenCheckpoints[token][nCheckpoints - 1].timestamp <= timestamp) {
+            return (rewardPerTokenCheckpoints[token][nCheckpoints - 1].rewardPerToken, rewardPerTokenCheckpoints[token][nCheckpoints - 1].timestamp);
+        }
+
+        // Next check implicit zero balance
+        if (rewardPerTokenCheckpoints[token][0].timestamp > timestamp) {
+            return (0,0);
+        }
+
+        uint lower = 0;
+        uint upper = nCheckpoints - 1;
+        while (upper > lower) {
+            uint center = upper - (upper - lower) / 2; // ceil, avoiding overflow
+            RewardPerTokenCheckpoint memory cp = rewardPerTokenCheckpoints[token][center];
+            if (cp.timestamp == timestamp) {
+                return (cp.rewardPerToken, cp.timestamp);
+            } else if (cp.timestamp < timestamp) {
+                lower = center;
+            } else {
+                upper = center - 1;
+            }
+        }
+        return (rewardPerTokenCheckpoints[token][lower].rewardPerToken, rewardPerTokenCheckpoints[token][lower].timestamp);
+    }
+
+    function _writeCheckpoint(address account, uint balance) internal {
         uint _timestamp = block.timestamp;
-        uint _nCheckPoints = numCheckpoints[tokenId];
-        if (_nCheckPoints > 0 && checkpoints[tokenId][_nCheckPoints - 1].timestamp == _timestamp) {
-            checkpoints[tokenId][_nCheckPoints - 1].balanceOf = balance;
+        uint _nCheckPoints = numCheckpoints[account];
+
+        if (_nCheckPoints > 0 && checkpoints[account][_nCheckPoints - 1].timestamp == _timestamp) {
+            checkpoints[account][_nCheckPoints - 1].balanceOf = balance;
         } else {
-            checkpoints[tokenId][_nCheckPoints] = Checkpoint(_timestamp, balance);
-            numCheckpoints[tokenId] = _nCheckPoints + 1;
+            checkpoints[account][_nCheckPoints] = Checkpoint(_timestamp, balance);
+            numCheckpoints[account] = _nCheckPoints + 1;
+        }
+    }
+
+    function _writeRewardPerTokenCheckpoint(address token, uint reward, uint timestamp) internal {
+        uint _nCheckPoints = rewardPerTokenNumCheckpoints[token];
+
+        if (_nCheckPoints > 0 && rewardPerTokenCheckpoints[token][_nCheckPoints - 1].timestamp == timestamp) {
+            rewardPerTokenCheckpoints[token][_nCheckPoints - 1].rewardPerToken = reward;
+        } else {
+            rewardPerTokenCheckpoints[token][_nCheckPoints] = RewardPerTokenCheckpoint(timestamp, reward);
+            rewardPerTokenNumCheckpoints[token] = _nCheckPoints + 1;
         }
     }
 
@@ -671,9 +779,9 @@ contract ExternalBribe is Initializable {
         uint _timestamp = block.timestamp;
 
         if (_nCheckPoints > 0 && supplyCheckpoints[_nCheckPoints - 1].timestamp == _timestamp) {
-            supplyCheckpoints[_nCheckPoints - 1].supply = totalSupply;
+            supplyCheckpoints[_nCheckPoints - 1].supply = derivedSupply;
         } else {
-            supplyCheckpoints[_nCheckPoints] = SupplyCheckpoint(_timestamp, totalSupply);
+            supplyCheckpoints[_nCheckPoints] = SupplyCheckpoint(_timestamp, derivedSupply);
             supplyNumCheckpoints = _nCheckPoints + 1;
         }
     }
@@ -681,135 +789,285 @@ contract ExternalBribe is Initializable {
     function rewardsListLength() external view returns (uint) {
         return rewards.length;
     }
-
-    // returns the last time the reward was modified or periodFinish if the reward has ended
+    /// @dev returns the last time the reward was modified or periodFinish if the reward has ended
     function lastTimeRewardApplicable(address token) public view returns (uint) {
         return Math.min(block.timestamp, periodFinish[token]);
     }
 
-    // allows a user to claim rewards for a given token
-    function getReward(uint tokenId, address[] memory tokens) external lock  {
-        require(IVotingEscrow(_ve).isApprovedOrOwner(msg.sender, tokenId), "Neither approved nor owner");
+    function getReward(address account, address[] memory tokens) external lock {
+        require(msg.sender == account || msg.sender == voter);
+        _locked = false;
+        IVoter(voter).distribute(address(this));
+        _locked = true;
+
         for (uint i = 0; i < tokens.length; i++) {
-            uint _reward = earned(tokens[i], tokenId);
-            lastEarn[tokens[i]][tokenId] = block.timestamp;
-            if (_reward > 0) _safeTransfer(tokens[i], msg.sender, _reward);
+            (rewardPerTokenStored[tokens[i]], lastUpdateTime[tokens[i]]) = _updateRewardPerToken(tokens[i], type(uint).max, true);
+
+            uint _reward = earned(tokens[i], account);
+            lastEarn[tokens[i]][account] = block.timestamp;
+            userRewardPerTokenStored[tokens[i]][account] = rewardPerTokenStored[tokens[i]];
+            if (_reward > 0) _safeTransfer(tokens[i], account, _reward);
 
             emit ClaimRewards(msg.sender, tokens[i], _reward);
         }
+
+        uint _derivedBalance = derivedBalances[account];
+        derivedSupply -= _derivedBalance;
+        _derivedBalance = derivedBalance(account);
+        derivedBalances[account] = _derivedBalance;
+        derivedSupply += _derivedBalance;
+
+        _writeCheckpoint(account, derivedBalances[account]);
+        _writeSupplyCheckpoint();
     }
 
-    // used by Voter to allow batched reward claims
-    function getRewardForOwner(uint tokenId, address[] memory tokens) external lock  {
-        require(msg.sender == voter, "Not voter");
-        address _owner = IVotingEscrow(_ve).ownerOf(tokenId);
-        for (uint i = 0; i < tokens.length; i++) {
-            uint _reward = earned(tokens[i], tokenId);
-            lastEarn[tokens[i]][tokenId] = block.timestamp;
-            if (_reward > 0) _safeTransfer(tokens[i], _owner, _reward);
-
-            emit ClaimRewards(_owner, tokens[i], _reward);
+    function rewardPerToken(address token) public view returns (uint) {
+        if (derivedSupply == 0) {
+            return rewardPerTokenStored[token];
         }
+        return rewardPerTokenStored[token] + ((lastTimeRewardApplicable(token) - Math.min(lastUpdateTime[token], periodFinish[token])) * rewardRate[token] * PRECISION / derivedSupply);
     }
 
-    function earned(address token, uint tokenId) public view returns (uint) {
-        if (numCheckpoints[tokenId] == 0) {
+    function derivedBalance(address account) public view returns (uint) {
+        return balanceOf[account];
+    }
+
+    function batchRewardPerToken(address token, uint maxRuns) external {
+        (rewardPerTokenStored[token], lastUpdateTime[token])  = _batchRewardPerToken(token, maxRuns);
+    }
+
+    function _batchRewardPerToken(address token, uint maxRuns) internal returns (uint, uint) {
+        uint _startTimestamp = lastUpdateTime[token];
+        uint reward = rewardPerTokenStored[token];
+
+        if (supplyNumCheckpoints == 0) {
+            return (reward, _startTimestamp);
+        }
+
+        if (rewardRate[token] == 0) {
+            return (reward, block.timestamp);
+        }
+
+        uint _startIndex = getPriorSupplyIndex(_startTimestamp);
+        uint _endIndex = Math.min(supplyNumCheckpoints-1, maxRuns);
+
+        for (uint i = _startIndex; i < _endIndex; i++) {
+            SupplyCheckpoint memory sp0 = supplyCheckpoints[i];
+            if (sp0.supply > 0) {
+                SupplyCheckpoint memory sp1 = supplyCheckpoints[i+1];
+                (uint _reward, uint _endTime) = _calcRewardPerToken(token, sp1.timestamp, sp0.timestamp, sp0.supply, _startTimestamp);
+                reward += _reward;
+                _writeRewardPerTokenCheckpoint(token, reward, _endTime);
+                _startTimestamp = _endTime;
+            }
+        }
+
+        return (reward, _startTimestamp);
+    }
+
+    function _calcRewardPerToken(address token, uint timestamp1, uint timestamp0, uint supply, uint startTimestamp) internal view returns (uint, uint) {
+        uint endTime = Math.max(timestamp1, startTimestamp);
+        return (((Math.min(endTime, periodFinish[token]) - Math.min(Math.max(timestamp0, startTimestamp), periodFinish[token])) * rewardRate[token] * PRECISION / supply), endTime);
+    }
+
+    /// @dev Update stored rewardPerToken values without the last one snapshot
+    ///      If the contract will get "out of gas" error on users actions this will be helpful
+    function batchUpdateRewardPerToken(address token, uint maxRuns) external {
+      (rewardPerTokenStored[token], lastUpdateTime[token]) = _updateRewardPerToken(token, maxRuns, false);
+    }
+
+    function _updateRewardForAllTokens() internal {
+      uint length = rewards.length;
+      for (uint i; i < length; i++) {
+        address token = rewards[i];
+        (rewardPerTokenStored[token], lastUpdateTime[token]) = _updateRewardPerToken(token, type(uint).max, true);
+      }
+    }
+
+    function _updateRewardPerToken(address token, uint maxRuns, bool actualLast) internal returns (uint, uint) {
+        uint _startTimestamp = lastUpdateTime[token];
+        uint reward = rewardPerTokenStored[token];
+
+        if (supplyNumCheckpoints == 0) {
+            return (reward, _startTimestamp);
+        }
+
+        if (rewardRate[token] == 0) {
+            return (reward, block.timestamp);
+        }
+
+        uint _startIndex = getPriorSupplyIndex(_startTimestamp);
+        uint _endIndex = Math.min(supplyNumCheckpoints - 1, maxRuns);
+
+        if (_endIndex > 0) {
+            for (uint i = _startIndex; i <= _endIndex - 1; i++) {
+                SupplyCheckpoint memory sp0 = supplyCheckpoints[i];
+                if (sp0.supply > 0) {
+                    SupplyCheckpoint memory sp1 = supplyCheckpoints[i+1];
+                    (uint _reward, uint _endTime) = _calcRewardPerToken(token, sp1.timestamp, sp0.timestamp, sp0.supply, _startTimestamp);
+                    reward += _reward;
+                    _writeRewardPerTokenCheckpoint(token, reward, _endTime);
+                    _startTimestamp = _endTime;
+                }
+            }
+        }
+
+        // need to override the last value with actual numbers only on deposit/withdraw/claim/notify actions
+        if (actualLast) {
+            SupplyCheckpoint memory sp = supplyCheckpoints[_endIndex];
+            if (sp.supply > 0) {
+                (uint _reward,) = _calcRewardPerToken(token, lastTimeRewardApplicable(token), Math.max(sp.timestamp, _startTimestamp), sp.supply, _startTimestamp);
+                reward += _reward;
+                _writeRewardPerTokenCheckpoint(token, reward, block.timestamp);
+                _startTimestamp = block.timestamp;
+            }
+        }
+
+        return (reward, _startTimestamp);
+    }
+
+    /// @dev earned is an estimation, it won't be exact till the supply > rewardPerToken calculations have run
+    function earned(address token, address account) public view returns (uint) {
+        uint _startTimestamp = Math.max(lastEarn[token][account], rewardPerTokenCheckpoints[token][0].timestamp);
+        if (numCheckpoints[account] == 0) {
             return 0;
         }
 
+        uint _startIndex = getPriorBalanceIndex(account, _startTimestamp);
+        uint _endIndex = numCheckpoints[account]-1;
+
         uint reward = 0;
-        uint _ts = 0;
-        uint _bal = 0;
-        uint _supply = 1;
-        uint _index = 0;
-        uint _currTs = _bribeStart(lastEarn[token][tokenId]); // take epoch last claimed in as starting point
 
-        _index = getPriorBalanceIndex(tokenId, _currTs);
-        _ts = checkpoints[tokenId][_index].timestamp;
-        _bal = checkpoints[tokenId][_index].balanceOf;
-        // accounts for case where lastEarn is before first checkpoint
-        _currTs = Math.max(_currTs, _bribeStart(_ts));
-
-        // get epochs between current epoch and first checkpoint in same epoch as last claim
-        uint numEpochs = (_bribeStart(block.timestamp) - _currTs) / DURATION;
-
-        if (numEpochs > 0) {
-            for (uint256 i = 0; i < numEpochs; i++) {
-                // get index of last checkpoint in this epoch
-                _index = getPriorBalanceIndex(tokenId, _currTs + DURATION);
-                // get checkpoint in this epoch
-                _ts = checkpoints[tokenId][_index].timestamp;
-                _bal = checkpoints[tokenId][_index].balanceOf;
-                // get supply of last checkpoint in this epoch
-                _supply = supplyCheckpoints[getPriorSupplyIndex(_currTs + DURATION)].supply;
-                /// Bribes but no voters? Let admin decide, via rescue.
-                /// Previously this bricked claims for all (division by Zero)
-                if (_supply > 0) {
-                    reward += _bal * tokenRewardsPerEpoch[token][_currTs] / _supply;
-                }
-                _currTs += DURATION;
+        if (_endIndex > 0) {
+            for (uint i = _startIndex; i <= _endIndex-1; i++) {
+                Checkpoint memory cp0 = checkpoints[account][i];
+                Checkpoint memory cp1 = checkpoints[account][i+1];
+                (uint _rewardPerTokenStored0,) = getPriorRewardPerToken(token, cp0.timestamp);
+                (uint _rewardPerTokenStored1,) = getPriorRewardPerToken(token, cp1.timestamp);
+                reward += cp0.balanceOf * (_rewardPerTokenStored1 - _rewardPerTokenStored0) / PRECISION;
             }
         }
+
+        Checkpoint memory cp = checkpoints[account][_endIndex];
+        (uint _rewardPerTokenStored,) = getPriorRewardPerToken(token, cp.timestamp);
+        reward += cp.balanceOf * (rewardPerToken(token) - Math.max(_rewardPerTokenStored, userRewardPerTokenStored[token][account])) / PRECISION;
 
         return reward;
     }
 
-    // This is an external function, but internal notation is used since it can only be called "internally" from Gauges
-    function _deposit(uint amount, uint tokenId) external {
-        require(msg.sender == voter, "Not voter");
-        require(amount > 0, "Zero amount");
+    function depositAll(uint tokenId) external {
+        deposit(IERC20(stake).balanceOf(msg.sender), tokenId);
+    }
 
+    function deposit(uint amount, uint tokenId) public lock {
+        require(amount > 0);
+        _updateRewardForAllTokens();
+
+        _safeTransferFrom(stake, msg.sender, address(this), amount);
         totalSupply += amount;
-        balanceOf[tokenId] += amount;
+        balanceOf[msg.sender] += amount;
 
-        _writeCheckpoint(tokenId, balanceOf[tokenId]);
+        if (tokenId > 0) {
+            require(IVotingEscrow(_ve).ownerOf(tokenId) == msg.sender);
+            if (tokenIds[msg.sender] == 0) {
+                tokenIds[msg.sender] = tokenId;
+                IVoter(voter).attachTokenToGauge(tokenId, msg.sender);
+            }
+            require(tokenIds[msg.sender] == tokenId);
+        } else {
+            tokenId = tokenIds[msg.sender];
+        }
+
+        uint _derivedBalance = derivedBalances[msg.sender];
+        derivedSupply -= _derivedBalance;
+        _derivedBalance = derivedBalance(msg.sender);
+        derivedBalances[msg.sender] = _derivedBalance;
+        derivedSupply += _derivedBalance;
+
+        _writeCheckpoint(msg.sender, _derivedBalance);
         _writeSupplyCheckpoint();
 
+        IVoter(voter).emitDeposit(tokenId, msg.sender, amount);
         emit Deposit(msg.sender, tokenId, amount);
     }
 
-    function _withdraw(uint amount, uint tokenId) external {
-        require(msg.sender == voter, "Not voter");
+    function withdrawAll() external {
+        withdraw(balanceOf[msg.sender]);
+    }
+
+    function withdraw(uint amount) public {
+        uint tokenId = 0;
+        if (amount == balanceOf[msg.sender]) {
+            tokenId = tokenIds[msg.sender];
+        }
+        withdrawToken(amount, tokenId);
+    }
+
+    function withdrawToken(uint amount, uint tokenId) public lock {
+        _updateRewardForAllTokens();
 
         totalSupply -= amount;
-        balanceOf[tokenId] -= amount;
+        balanceOf[msg.sender] -= amount;
+        _safeTransfer(stake, msg.sender, amount);
 
-        _writeCheckpoint(tokenId, balanceOf[tokenId]);
+        if (tokenId > 0) {
+            require(tokenId == tokenIds[msg.sender]);
+            tokenIds[msg.sender] = 0;
+            IVoter(voter).detachTokenFromGauge(tokenId, msg.sender);
+        } else {
+            tokenId = tokenIds[msg.sender];
+        }
+
+        uint _derivedBalance = derivedBalances[msg.sender];
+        derivedSupply -= _derivedBalance;
+        _derivedBalance = derivedBalance(msg.sender);
+        derivedBalances[msg.sender] = _derivedBalance;
+        derivedSupply += _derivedBalance;
+
+        _writeCheckpoint(msg.sender, derivedBalances[msg.sender]);
         _writeSupplyCheckpoint();
 
+        IVoter(voter).emitWithdraw(tokenId, msg.sender, amount);
         emit Withdraw(msg.sender, tokenId, amount);
     }
 
     function left(address token) external view returns (uint) {
-        uint adjustedTstamp = getEpochStart(block.timestamp);
-        return tokenRewardsPerEpoch[token][adjustedTstamp];
+        if (block.timestamp >= periodFinish[token]) return 0;
+        uint _remaining = periodFinish[token] - block.timestamp;
+        return _remaining * rewardRate[token];
     }
 
     function notifyRewardAmount(address token, uint amount) external lock {
+        require(token != stake);
+        require(amount > 0);
         if (!isReward[token]) {
-          require(IVoter(voter).isWhitelisted(token), "bribe tokens must be whitelisted");
-          require(rewards.length < MAX_REWARD_TOKENS, "too many rewards tokens");
+            require(IVoter(voter).isWhitelisted(token), "rewards tokens must be whitelisted");
+            require(rewards.length < MAX_REWARD_TOKENS, "too many rewards tokens");
         }
-        // bribes kick in at the start of next bribe period
-        uint adjustedTstamp = getEpochStart(block.timestamp);
-        uint epochRewards = tokenRewardsPerEpoch[token][adjustedTstamp];
+        if (rewardRate[token] == 0) _writeRewardPerTokenCheckpoint(token, 0, block.timestamp);
+        (rewardPerTokenStored[token], lastUpdateTime[token]) = _updateRewardPerToken(token, type(uint).max, true);
+        _claimFees();
 
-        uint rtbb = IERC20(token).balanceOf(address(this));
-        _safeTransferFrom(token, msg.sender, address(this), amount);
-        uint rtba = IERC20(token).balanceOf(address(this));
-        amount = rtba - rtbb;
-        require(amount > 0, "Amount must be greater than 0");
-
-        tokenRewardsPerEpoch[token][adjustedTstamp] = epochRewards + amount;
-
-        periodFinish[token] = adjustedTstamp + DURATION;
-
+        if (block.timestamp >= periodFinish[token]) {
+            _safeTransferFrom(token, msg.sender, address(this), amount);
+            rewardRate[token] = amount / DURATION;
+        } else {
+            uint _remaining = periodFinish[token] - block.timestamp;
+            uint _left = _remaining * rewardRate[token];
+            require(amount > _left);
+            _safeTransferFrom(token, msg.sender, address(this), amount);
+            rewardRate[token] = (amount + _left) / DURATION;
+        }
+        require(rewardRate[token] > 0);
+        uint balance = IERC20(token).balanceOf(address(this));
+        require(rewardRate[token] <= balance / DURATION, "Provided reward too high");
+        periodFinish[token] = block.timestamp + DURATION;
         if (!isReward[token]) {
             isReward[token] = true;
             rewards.push(token);
         }
 
-        emit NotifyReward(msg.sender, token, adjustedTstamp, amount);
+        emit NotifyReward(msg.sender, token, amount);
     }
 
     function swapOutRewardToken(uint i, address oldToken, address newToken) external {
@@ -820,52 +1078,57 @@ contract ExternalBribe is Initializable {
         rewards[i] = newToken;
     }
 
-    /// This can break claims of bribes! Useful during a platform-wide upgrade (optional)
-    function rescue(uint _amt, address _token, address _to) external {
-        require(msg.sender == IVotingEscrow(_ve).team(), "only team");
-        IERC20(_token).transfer(_to, _amt);
-    }
-
     function _safeTransfer(address token, address to, uint256 value) internal {
-        require(token.code.length > 0, "Invalid token address");
+        require(token.code.length > 0);
         (bool success, bytes memory data) =
         token.call(abi.encodeWithSelector(IERC20.transfer.selector, to, value));
-        require(success && (data.length == 0 || abi.decode(data, (bool))), "ExternalBribe: TransferFrom failed");
+        require(success && (data.length == 0 || abi.decode(data, (bool))));
     }
 
     function _safeTransferFrom(address token, address from, address to, uint256 value) internal {
-        require(token.code.length > 0, "Invalid token address");
+        require(token.code.length > 0);
         (bool success, bytes memory data) =
         token.call(abi.encodeWithSelector(IERC20.transferFrom.selector, from, to, value));
-        require(success && (data.length == 0 || abi.decode(data, (bool))), "ExternalBribe: TransferFrom failed");
+        require(success && (data.length == 0 || abi.decode(data, (bool))));
+    }
+
+    function _safeApprove(address token, address spender, uint256 value) internal {
+        require(token.code.length > 0);
+        (bool success, bytes memory data) =
+        token.call(abi.encodeWithSelector(IERC20.approve.selector, spender, value));
+        require(success && (data.length == 0 || abi.decode(data, (bool))));
     }
 }
 
-
-// File: contracts/interfaces/IBribeFactory.sol
-
-
-pragma solidity 0.8.9;
-
-interface IBribeFactory {
-    function createBribe(address[] memory) external returns (address);
-}
-
-// File: contracts/factories/BribeFactory.sol
+// File: contracts/factories/GaugeFactory.sol
 
 
 pragma solidity 0.8.9;
 
 
 
+contract GaugeFactory is IGaugeFactory {
+    address public lastGauge;
 
-contract BribeFactory is IBribeFactory {
-    address public lastBribe;
-
-    function createBribe(address[] memory _allowedRewards) external returns (address) {
-        ExternalBribe externalBribe = new ExternalBribe();
-        externalBribe.initialize(msg.sender, _allowedRewards);
-        lastBribe = address(externalBribe);
-        return lastBribe;
+    function createGauge(
+        address _pool,
+        address _internalBribe,
+        address _externalBribe,
+        address _ve,
+        bool isPair,
+        address[] memory _allowedRewards
+    ) external returns (address) {
+        Gauge gauge = new Gauge();
+        gauge.initialize(
+            _pool,
+            _internalBribe,
+            _externalBribe,
+            _ve,
+            msg.sender,
+            isPair,
+            _allowedRewards
+        );
+        lastGauge = address(gauge);
+        return lastGauge;
     }
 }

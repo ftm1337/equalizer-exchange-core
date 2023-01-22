@@ -552,8 +552,8 @@ contract ExternalBribe is Initializable {
     /// @notice simple re-entrancy check
     bool internal _locked;
 
-    event Deposit(address indexed from, uint tokenId, uint amount);
-    event Withdraw(address indexed from, uint tokenId, uint amount);
+    event Deposit(address indexed voter, address indexed owner, uint indexed tokenId, uint amount);
+    event Withdraw(address indexed voter, address indexed owner, uint indexed tokenId, uint amount);
     event NotifyReward(address indexed from, address indexed reward, uint epoch, uint amount);
     event ClaimRewards(address indexed from, address indexed reward, uint amount);
 
@@ -755,7 +755,7 @@ contract ExternalBribe is Initializable {
     }
 
     // This is an external function, but internal notation is used since it can only be called "internally" from Gauges
-    function _deposit(uint amount, uint tokenId) external {
+    function _deposit(uint amount, uint tokenId, address _vtr, address _onr) external {
         require(msg.sender == voter, "Not voter");
         require(amount > 0, "Zero amount");
 
@@ -765,10 +765,10 @@ contract ExternalBribe is Initializable {
         _writeCheckpoint(tokenId, balanceOf[tokenId]);
         _writeSupplyCheckpoint();
 
-        emit Deposit(msg.sender, tokenId, amount);
+        emit Deposit(_vtr, _onr, tokenId, amount);
     }
 
-    function _withdraw(uint amount, uint tokenId) external {
+    function _withdraw(uint amount, uint tokenId, address _vtr, address _onr) external {
         require(msg.sender == voter, "Not voter");
 
         totalSupply -= amount;
@@ -777,7 +777,7 @@ contract ExternalBribe is Initializable {
         _writeCheckpoint(tokenId, balanceOf[tokenId]);
         _writeSupplyCheckpoint();
 
-        emit Withdraw(msg.sender, tokenId, amount);
+        emit Withdraw(_vtr, _onr, tokenId, amount);
     }
 
     function left(address token) external view returns (uint) {

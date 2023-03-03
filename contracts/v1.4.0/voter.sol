@@ -623,6 +623,7 @@ contract Voter is Initializable {
     mapping(address => bool) public unvotable; // disable voting for certain pools
     mapping(address => bool) public gaugable; // enable creation for pools with one of these constituents
     bool public pokable; // toggle poking
+    bool public attachable; // useless appendix: boosted farming
 
 
 
@@ -827,6 +828,9 @@ contract Voter is Initializable {
               allowedRewards[2] = base;
             }
         }
+        else {
+        	allowedRewards[0] = base;
+        }
 
         if (msg.sender != governor) { // gov can create for any pool, even non-Equalizer pairs
             require(isPair, "!_pool");
@@ -940,24 +944,25 @@ contract Voter is Initializable {
         }
     }
 
-    function claimRewards(address[] memory _gauges, address[][] memory _tokens) external {
+    function claimRewards(address[] memory _gauges, address[][] memory _tokens) public {
         for (uint i = 0; i < _gauges.length; i++) {
             IGauge(_gauges[i]).getReward(msg.sender, _tokens[i]);
         }
     }
 
-    function claimBribes(address[] memory _bribes, address[][] memory _tokens, uint _tokenId) external {
+    function claimBribes(address[] memory _bribes, address[][] memory _tokens, uint _tokenId) public {
         require(IVotingEscrow(_ve).isApprovedOrOwner(msg.sender, _tokenId));
         for (uint i = 0; i < _bribes.length; i++) {
             IBribe(_bribes[i]).getRewardForOwner(_tokenId, _tokens[i]);
         }
     }
 
-    function claimFees(address[] memory _fees, address[][] memory _tokens, uint _tokenId) external {
-        require(IVotingEscrow(_ve).isApprovedOrOwner(msg.sender, _tokenId));
-        for (uint i = 0; i < _fees.length; i++) {
-            IBribe(_fees[i]).getRewardForOwner(_tokenId, _tokens[i]);
-        }
+    function claimEverything(
+    	address[] memory _gauges, address[][] memory _gtokens,
+    	address[] memory _bribes, address[][] memory _btokens, uint _tokenId
+    ) external {
+        claimRewards(_gauges, _gtokens);
+        claimBribes(_bribes, _btokens, _tokenId);
     }
 
     function distributeFees(uint _start, uint _end) external {

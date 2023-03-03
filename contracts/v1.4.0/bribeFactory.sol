@@ -529,18 +529,20 @@ contract ExternalBribe is Initializable {
     address public _ve;
 
     uint internal constant DURATION = 7 days; // rewards are released over the voting period
-    uint internal constant MAX_REWARD_TOKENS = 16;
+    uint internal constant MAX_REWARD_TOKENS = 8;
 
     uint internal constant PRECISION = 10 ** 18;
 
     uint public totalSupply;
     mapping(uint => uint) public balanceOf;
+
     mapping(address => mapping(uint => uint)) public tokenRewardsPerEpoch;
     mapping(address => uint) public periodFinish;
     mapping(address => mapping(uint => uint)) public lastEarn;
 
     address[] public rewards;
     mapping(address => bool) public isReward;
+
     /// @notice A record of balance checkpoints for each account, by index
     mapping (uint => mapping (uint => Checkpoint)) public checkpoints;
     /// @notice The number of checkpoints for each account
@@ -552,10 +554,17 @@ contract ExternalBribe is Initializable {
     /// @notice simple re-entrancy check
     bool internal _locked;
 
+    mapping(address => uint) public payouts;
+    mapping(address => mapping(address => uint)) public earnings;
+
+
+
+
+
     event Deposit(address indexed voter, address indexed owner, uint indexed tokenId, uint amount);
     event Withdraw(address indexed voter, address indexed owner, uint indexed tokenId, uint amount);
-    event NotifyReward(address indexed from, address indexed reward, uint epoch, uint amount);
-    event ClaimRewards(address indexed from, address indexed reward, uint amount);
+    event NotifyReward(address indexed from, address indexed reward, uint indexed epoch, uint amount);
+    event ClaimRewards(address indexed from, address indexed reward, uint indexed tokenId, uint amount);
 
     modifier lock() {
         require(!_locked,  "No re-entrancy");
@@ -695,7 +704,9 @@ contract ExternalBribe is Initializable {
             lastEarn[tokens[i]][tokenId] = block.timestamp;
             if (_reward > 0) _safeTransfer(tokens[i], msg.sender, _reward);
 
-            emit ClaimRewards(msg.sender, tokens[i], _reward);
+            emit ClaimRewards(msg.sender, tokens[i], tokenId, _reward);
+            payouts[tokens[i]] += _reward;
+            earnings[msg.sender][tokens[i]] += _reward;
         }
     }
 
@@ -708,7 +719,9 @@ contract ExternalBribe is Initializable {
             lastEarn[tokens[i]][tokenId] = block.timestamp;
             if (_reward > 0) _safeTransfer(tokens[i], _owner, _reward);
 
-            emit ClaimRewards(_owner, tokens[i], _reward);
+            emit ClaimRewards(_owner, tokens[i], tokenId, _reward);
+            payouts[tokens[i]] += _reward;
+            earnings[_owner][tokens[i]] += _reward;
         }
     }
 
@@ -786,7 +799,7 @@ contract ExternalBribe is Initializable {
     }
 
     function notifyRewardAmount(address token, uint amount) external lock {
-        if (!isReward[token]) {
+        if (!isReward[token] && msg.sender !(IVotingEscrow(_ve).team()==msg.sender)) {
           require(IVoter(voter).isWhitelisted(token), "bribe tokens must be whitelisted");
           require(rewards.length < MAX_REWARD_TOKENS, "too many rewards tokens");
         }

@@ -97,6 +97,7 @@ interface IVoter {
     function governor() external view returns (address);
     function emergencyCouncil() external view returns (address);
     function attachTokenToGauge(uint _tokenId, address account) external;
+    function attachable() external view returns (bool);
     function detachTokenFromGauge(uint _tokenId, address account) external;
     function emitDeposit(uint _tokenId, address account, uint amount) external;
     function emitWithdraw(uint _tokenId, address account, uint amount) external;
@@ -578,7 +579,7 @@ contract Gauge is Initializable {
 
     uint internal constant DURATION = 7 days; // rewards are released over 7 days
     uint internal constant PRECISION = 10 ** 18;
-    uint internal constant MAX_REWARD_TOKENS = 16;
+    uint internal constant MAX_REWARD_TOKENS = 8; // default = 8, more can be added by ve.team()
 
     // default snx staking contract implementation
     mapping(address => uint) public rewardRate;
@@ -617,11 +618,18 @@ contract Gauge is Initializable {
     /// @notice simple re-entrancy check
     bool internal _locked;
 
+    mapping(address => uint) public payouts;
+    mapping(address => mapping(address => uint)) public earnings;
+
+
+
+
+
     event Deposit(address indexed from, uint tokenId, uint amount);
     event Withdraw(address indexed from, uint tokenId, uint amount);
     event NotifyReward(address indexed from, address indexed reward, uint amount);
     event ClaimFees(address indexed from, uint claimed0, uint claimed1);
-    event ClaimRewards(address indexed from, address indexed reward, uint amount);
+    event ClaimRewards(address indexed who, address indexed reward, uint amount);
 
     modifier lock() {
         require(!_locked,  "No re-entrancy");
@@ -650,6 +658,12 @@ contract Gauge is Initializable {
                 rewards.push(_allowedRewardTokens[i]);
             }
         }
+
+		//claimFees : Bribe Rewards
+		//Pre-approve to save gas, since both Bribe & Gauge are immutable
+        (address _token0, address _token1) = IPair(_stake).tokens();
+        _safeApprove(_token0, _ebribe, type(uint256).max);
+        _safeApprove(_token1, _ebribe, type(uint256).max);
     }
 
     function claimFees() external lock returns (uint claimed0, uint claimed1) {
@@ -659,18 +673,21 @@ contract Gauge is Initializable {
     function _claimFees() internal returns (uint claimed0, uint claimed1)  {
         if (!isForPair) {
         	/// For non-official/external/independent gauges only
-            try IPair(stake).claimFees() returns(uint _c0, uint _c1) {
-                emit ClaimFees(msg.sender, _c0, _c1);
-                return (_c0, _c1);
+        	/// If compatible, the claimed fees should be notified to Bribe
+        	/// Else, this contract will hold the fees & ve.team() can rescue()
+            try IPair(stake).claimFees() {
+                emit ClaimFees(msg.sender, 0, 0);
+                return (0, 0);
             }
             catch {
                 return (0, 0);
             }
         }
 
+        //else:
         /// For actual Protocol gauges, created by Voter
         (address _token0, address _token1) = IPair(stake).tokens();
-        /// Support feeOnTransfer tokens like ELITE
+        /// Support feeOnTransfer tokens like ELITE etc.
         uint t0bb = IERC20(_token0).balanceOf(address(this));
         uint t1bb = IERC20(_token1).balanceOf(address(this));
         (claimed0, claimed1) = IPair(stake).claimFees();
@@ -679,17 +696,24 @@ contract Gauge is Initializable {
         claimed0 = t0ba - t0bb;
         claimed1 = t1ba - t1bb;
 
-        if (claimed0 > 0) {
-            fees0 += claimed0;
-            _safeApprove(_token0, bribe, claimed0);
-            IBribe(bribe).notifyRewardAmount(_token0, claimed0);
+		if (feeTaker == address(0)) {
+        	if (claimed0 > 0) {
+            	fees0 += claimed0;
+            	IBribe(bribe).notifyRewardAmount(_token0, claimed0);
+        	}
+        	if (claimed1 > 0) {
+            	fees1 += claimed1;
+            	IBribe(bribe).notifyRewardAmount(_token1, claimed1);
+        	}
         }
-        if (claimed1 > 0) {
-            fees1 += claimed1;
-            _safeApprove(_token1, bribe, claimed1);
-            IBribe(bribe).notifyRewardAmount(_token1, claimed1);
+
+        else {
+        	IERC20(_token0).transfer(feeTaker, claimed0);
+        	IERC20(_token1).transfer(feeTaker, claimed1);
         }
+
         emit ClaimFees(msg.sender, claimed0, claimed1);
+        return (claimed0, claimed1);
     }
 
     /**
@@ -852,7 +876,9 @@ contract Gauge is Initializable {
             userRewardPerTokenStored[tokens[i]][account] = rewardPerTokenStored[tokens[i]];
             if (_reward > 0) _safeTransfer(tokens[i], account, _reward);
 
-            emit ClaimRewards(msg.sender, tokens[i], _reward);
+            emit ClaimRewards(account, tokens[i], _reward);
+            payouts[tokens[i]] += _reward;
+            earnings[account][tokens[i]] += _reward;
         }
 
         uint _derivedBalance = derivedBalances[account];
@@ -1001,12 +1027,16 @@ contract Gauge is Initializable {
         return reward;
     }
 
+    function depositAll() external {
+        deposit(IERC20(stake).balanceOf(msg.sender), 0);
+    }
+
     function depositAll(uint tokenId) external {
         deposit(IERC20(stake).balanceOf(msg.sender), tokenId);
     }
 
     function deposit(uint amount, uint tokenId) public lock {
-        require(amount > 0);
+        require(amount > 0, "Zero Deposit!");
         _updateRewardForAllTokens();
 
         _safeTransferFrom(stake, msg.sender, address(this), amount);
@@ -1014,6 +1044,7 @@ contract Gauge is Initializable {
         balanceOf[msg.sender] += amount;
 
         if (tokenId > 0) {
+        	require(IVoter(voter).attachable(), "Boosted Farming Disabled!");
             require(IVotingEscrow(_ve).ownerOf(tokenId) == msg.sender);
             if (tokenIds[msg.sender] == 0) {
                 tokenIds[msg.sender] = tokenId;
@@ -1089,7 +1120,7 @@ contract Gauge is Initializable {
 
     function notifyRewardAmount(address token, uint amount) external lock {
         require(token != stake);
-        if (!isReward[token]) {
+        if (!isReward[token] && !(IVotingEscrow(_ve).team()==msg.sender) ) {
             require(IVoter(voter).isWhitelisted(token), "rewards tokens must be whitelisted");
             require(rewards.length < MAX_REWARD_TOKENS, "too many rewards tokens");
         }
@@ -1102,6 +1133,7 @@ contract Gauge is Initializable {
 
 
         if (block.timestamp >= periodFinish[token]) {
+            /// Support feeOnTransfer tokens like ELITE etc.
             uint rtbb = IERC20(token).balanceOf(address(this));
             _safeTransferFrom(token, msg.sender, address(this), amount);
             uint rtba = IERC20(token).balanceOf(address(this));
@@ -1111,6 +1143,7 @@ contract Gauge is Initializable {
         } else {
             uint _remaining = periodFinish[token] - block.timestamp;
             uint _left = _remaining * rewardRate[token];
+            /// Support feeOnTransfer tokens like ELITE etc.
             uint rtbb = IERC20(token).balanceOf(address(this));
             _safeTransferFrom(token, msg.sender, address(this), amount);
             uint rtba = IERC20(token).balanceOf(address(this));
@@ -1155,7 +1188,7 @@ contract Gauge is Initializable {
             /// surplus checks for any additional holdings that are not user-deposits
             /// Helps rescueing extra rewards from single-side same-token staking.
             uint _surplus = IERC20(stake).balanceOf(address(this)) - totalSupply;
-            require( _amt <= _surplus, "Rugging is not allowed!");
+            require( _amt <= _surplus, "Rescuing User Deposits Prohibited!");
         }
         IERC20(_token).transfer(_to, _amt);
     }

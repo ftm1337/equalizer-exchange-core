@@ -29,8 +29,10 @@ This new version includes a lot of changes, especially to the way in which Trade
 Below is the procedure we are looking to adopt for migrating from the current contracts to new contracts. If you find any loopholes or anything thats missing, please inform us :)
 - Order of executing each step is important.
 
+*Note: hotload refers to the `initialize` function on the new implementation.*
+
 ## Basics
-### 3-4 March
+### 3-15 March
 
 - [x] Deploy v2.Implementations
 - [x] Deploy v2.Proxies
@@ -48,7 +50,7 @@ Below is the procedure we are looking to adopt for migrating from the current co
 	- [ ] TEST overriding notification of bribes to v2.Gauges.feeTaker
 
 ## Review
-### 3-7 March
+### 3-15 March
 
 - [ ] Get GamePlan reviewed by Peer 1
 - [ ] Get GamePlan reviewed by Peer 2
@@ -61,16 +63,16 @@ Below is the procedure we are looking to adopt for migrating from the current co
 
 
 ## Preparation
-### 8 March, Wednesday
+### 15 March, Wednesday
 
 - [ ] Re-create ALL old (v1) gauges using new Voter (v2).
 
 - [ ] Each team member should create 30 Special NFTs with 0.01 EQUAL max Locked
 	- [ ] Each team member should vote for 10 different gauges with each NFT
 	- [ ] Make sure to cover each & every pool with 10% votes of a NFT (10 pools x 15 NFTs)
-	- [ ] Make sure votes are in before 8 March ends.
+	- [ ] Make sure votes are in before 15 March ends.
 - [ ] Upgrade v1.Voter
-	- [ ] Block new votes from 9 March 12 am
+	- [ ] Block new votes from 16 March 12 am
 	- [ ] Introduce ResetOverride function
 - [ ] Upgrade v1.VENFT
 	- [ ] Introduce oldVoter variable: To allow attach/detach calls from v1.Gauges (oldVoter is still 0x00. Dont change yet)
@@ -84,7 +86,7 @@ Below is the procedure we are looking to adopt for migrating from the current co
 
 
 ## Core Switch
-### 9 March, Thursday
+### 16 March, Thursday
 
 - [ ] Flip the epoch (v1.minter.update_period)
 - [ ] Distribute EQUAL emissions to all gauges (Make sure ALL gauges get as some rely on late friday distributions)
@@ -101,13 +103,13 @@ Below is the procedure we are looking to adopt for migrating from the current co
 	- [ ] TEST if bribes are added to the v2.Gauges (MUST WORK)
 
 ## Final Announcement
-### 15 March, Wednesday
+### 22 March, Wednesday
 
 - [ ] Ask Liquidity Providers to start moving to new Gauges
 > *Maybe provide some pre-v2 incentives for v2.. reduce previous emission and add it here to v2? NOTE: if incentives are added, the tradeFees from such gauges would be sent to bribes, but at this point nobody can vote.. consider setting up an interim feeTaker meanwhile.*
 
 ## Migration
-### 16 March, Thursday
+### 23 March, Thursday
 
 - [ ] Flip the epoch using v1.minter.update_period (MUST WORK)
 - [ ] Distribute EQUAL emissions to ALL gauges (MUST WORK)
@@ -117,7 +119,7 @@ Below is the procedure we are looking to adopt for migrating from the current co
 - [ ] TEST Claim EQUAL Gauge emissions via v2.Gauges.getReward(<0xEqualAddress>) (MUST WORK)
 
 ## Aftermath
-### 17 March - Future
+### 23 March - Future
 
 - [ ] Claim old internal & external Bribes from v1 using the Special 30 team veNFTs
 	- [ ] Send these to treasury (PoL?)

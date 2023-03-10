@@ -26,18 +26,19 @@ This new version includes a lot of changes, especially to the way in which Trade
 
 
 # Gameplan
-Order of executing each step is important.
+Below is the procedure we are looking to adopt for migrating from the current contracts to new contracts. If you find any loopholes or anything thats missing, please inform us :)
+- Order of executing each step is important.
 
 ## Basics
 ### 3-4 March
 
-- [ ] Deploy v2.Implementations
-- [ ] Deploy v2.Proxies
-- [ ] Initialize v2.voter
-- [ ] Add Whitelist tokens on v2.voter
-- [ ] Add Gaugeable tokens on v2.voter
-- [ ] Create new Gauges on v2.voter
-- [ ] TEST deposits/withdrawals from v2.Gauges
+- [x] Deploy v2.Implementations
+- [x] Deploy v2.Proxies
+- [x] Initialize v2.voter
+- [x] Add Whitelist tokens on v2.voter
+- [x] Add Gaugeable tokens on v2.voter
+- [x] Create new Gauges on v2.voter
+- [x] TEST deposits/withdrawals from v2.Gauges
 - [ ] TEST notification of bribes from v2.Gauges.deposit/widthdraw/claim
 - [ ] TEST overriding notification of bribes to v2.Gauges.feeTaker
 - [ ] TEST reward distribution

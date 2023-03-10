@@ -1,4 +1,11 @@
 /**
+ *v1.4.2
+ *0xB99c82191Ee5Dc240bd2a77827413574075ed2F6
+ *Submitted for verification at FtmScan.com on 2023-03-06
+*/
+/**
+ *v1.4.1
+ *0xFE363d3DE8a0beA47cC7d7f5c096D3852AdbC396
  *Submitted for verification at FtmScan.com on 2023-02-22
 */
 /**
@@ -538,7 +545,7 @@ abstract contract Initializable {
             _initializing = true;
         }
         _;
-        if (isTopLevelCall) {
+        if (isTopLevelCall) {function earned(address token, uint tokenId) public view returns (uint)
             _initializing = false;
             emit Initialized(1);
         }
@@ -988,7 +995,9 @@ contract Voter is Initializable {
     	address[] memory _bribes, address[][] memory _btokens, uint _tokenId
     ) external {
         claimRewards(_gauges, _gtokens);
-        claimBribes(_bribes, _btokens, _tokenId);
+        if(_tokenId > 0) {
+            claimBribes(_bribes, _btokens, _tokenId);
+        }
     }
 
     function distributeFees(uint _start, uint _end) external {

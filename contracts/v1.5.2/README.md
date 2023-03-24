@@ -21,6 +21,14 @@ BribeFactory | 0x8868ae6de5e723e6840cdc21370e415bf5123684 | 0x5d4589bba42df0c53b
 GaugeFactory | 0xec42750285e41848c00bf745894e8bc233a264c6 | 0xc8be3d680e31187a94b47119c5b2b095ce2be578
 Voter | 0x1739fa484acd863ca527b2db50ac782f4522210b | 0x4bebEB8188aEF8287f9a7d1E4f01d76cBE060d5b
 
+### Others
+
+Contract | Implementation | Proxy
+---- | ---- | ----
+Factory | | 0xc6366efd0af1d09171fe0ebf32c7943bb310832a
+Equal | | 0x3fd3a0c85b70754efc07ac9ac0cbbdce664865a6
+
+
 ### Diff
 
 

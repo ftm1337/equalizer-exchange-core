@@ -686,6 +686,8 @@ contract Voter is Initializable {
     mapping(address => bool) public gaugable; // enable creation for pools with one of these constituents
     bool public pokable; // toggle poking
 
+    address[] public whitelistings;
+
 
 
 	/********************************************************************************************/
@@ -891,6 +893,7 @@ contract Voter is Initializable {
     function _whitelist(address _token) internal {
         require(!isWhitelisted[_token], "Already whitelisted");
         isWhitelisted[_token] = true;
+        whitelistings.push( _token);
         emit Whitelisted(msg.sender, _token, true);
     }
 
@@ -988,6 +991,14 @@ contract Voter is Initializable {
 
     function length() external view returns (uint) {
         return pools.length;
+    }
+
+    function whitelistedTokens() external view returns (address[] memory) {
+    	address[] memory _r = new address[](whitelistings.length);
+    	for(uint i;i<whitelistings.length;i++) {
+    		_r[i] = whitelistings[i];
+    	}
+        return _r;
     }
 
     function notifyRewardAmount(uint amount) external {
@@ -1126,8 +1137,13 @@ contract Voter is Initializable {
         require(msg.sender == governor, "Not governor");
         for (uint i = 0; i < _tokens.length; i++) {
             delete isWhitelisted[_tokens[i]];
+            for(uint j; j<whitelistings.length;j++){
+            	if(whitelistings[j]==_tokens[i]){
+            		whitelistings[i] = whitelistings[whitelistings.length-1];
+            		whitelistings.pop();
+            	}
+            }
             emit Whitelisted(msg.sender, _tokens[i], false);
-
         }
     }
 

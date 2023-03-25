@@ -42,7 +42,7 @@ Below is the procedure we are looking to adopt for migrating from the current co
 *Note: hotload refers to the `initialize` function on the new implementation.*
 
 ## Basics
-### 3-15 March
+### 3-29 March
 
 - [x] Deploy v2.Implementations
 - [x] Deploy v2.Proxies
@@ -51,42 +51,51 @@ Below is the procedure we are looking to adopt for migrating from the current co
 - [x] Add Gaugeable tokens on v2.voter
 - [x] Create new Gauges on v2.voter
 - [x] TEST deposits/withdrawals from v2.Gauges
-- [ ] TEST notification of bribes from v2.Gauges.deposit/widthdraw/claim
+- [x] TEST notification of bribes from v2.Gauges.deposit/widthdraw/claim
 - [ ] TEST overriding notification of bribes to v2.Gauges.feeTaker
-- [ ] TEST reward distribution
-	- [ ] TEST Notify 0.01 EQUAL rewards to gauges
-	- [ ] TEST deposits/withdrawals from v2.Gauges
-	- [ ] TEST notification of bribes from v2.Gauges.deposit/widthdraw/claim
+- [x] TEST reward distribution
+	- [x] TEST Notify 0.01 EQUAL rewards to gauges
+	- [x] TEST deposits/withdrawals from v2.Gauges
+	- [x] TEST notification of bribes from v2.Gauges.deposit/widthdraw/claim
 	- [ ] TEST overriding notification of bribes to v2.Gauges.feeTaker
 
 ## Review
-### 3-15 March
+### 3-29 March
 
-- [ ] Get GamePlan reviewed by Peer 1
-- [ ] Get GamePlan reviewed by Peer 2
-- [ ] Get GamePlan reviewed by Peer 3
-- [ ] Get GamePlan reviewed by Peer 4
-- [ ] Get GamePlan reviewed by Peer 5
-- [ ] Get Contracts reviewed by Peer 1
-- [ ] Get Contracts reviewed by Peer 2
+- [x] Get GamePlan reviewed by Peer 1
+- [x] Get GamePlan reviewed by Peer 2
+- [x] Get GamePlan reviewed by Peer 3
+- [x] Get GamePlan reviewed by Peer 4
+- [x] Get GamePlan reviewed by Peer 5
+- [x] Get GamePlan reviewed by Peer 6
+- [ ] Get GamePlan reviewed by Peer 7
+- [ ] Get GamePlan reviewed by Peer 8
+- [ ] Get GamePlan reviewed by Peer 9
+- [ ] Get GamePlan reviewed by Peer 10
+- [x] Get Contracts reviewed by Peer 1
+- [x] Get Contracts reviewed by Peer 2
 - [ ] Get Contracts reviewed by Peer 3
+- [ ] Get Contracts reviewed by Peer 4
+- [ ] Get Contracts reviewed by Peer 5
+- [ ] Get Contracts reviewed by Peer 6
+- [ ] Get Contracts reviewed by Peer 7
 
 
 ## Preparation
-### 15 March, Wednesday
+### 29 March, Wednesday
 
 - [ ] Re-create ALL old (v1) gauges using new Voter (v2).
 
 - [ ] Each team member should create 30 Special NFTs with 0.01 EQUAL max Locked
 	- [ ] Each team member should vote for 10 different gauges with each NFT
 	- [ ] Make sure to cover each & every pool with 10% votes of a NFT (10 pools x 15 NFTs)
-	- [ ] Make sure votes are in before 15 March ends.
+	- [ ] Make sure votes are in before 29 March ends.
 - [ ] Upgrade v1.Voter
-	- [ ] Block new votes from 16 March 12 am
+	- [ ] Block new votes from 30 March 12 am
 	- [ ] Introduce ResetOverride function
+	- [ ] Introduce retireTime variable: To make calls to distribute have no effect after retireTime
 - [ ] Upgrade v1.VENFT
 	- [ ] Introduce oldVoter variable: To allow attach/detach calls from v1.Gauges (oldVoter is still 0x00. Dont change yet)
-	- [ ] Introduce retireTime variable: To make calls to distribute have no effect after retireTime
 	- [ ] Introduce hotLoad function:
 		- To load new Voter address into Venft contract (Dont call hotLoad yet)
 		- To set oldVoter variable (Dont call hotLoad yet)
@@ -96,11 +105,13 @@ Below is the procedure we are looking to adopt for migrating from the current co
 
 
 ## Core Switch
-### 16 March, Thursday
+### 30 March, Thursday
 
 - [ ] Flip the epoch (v1.minter.update_period)
-- [ ] Distribute EQUAL emissions to all gauges (Make sure ALL gauges get as some rely on late friday distributions)
-- [ ] Start resetting everyone's votes via v1.voter.resetOverride (dont reset the 20 new special nfts held by each team member)
+- [ ] Distribute EQUAL emissions to all gauges
+	- Make sure ALL gauges get as some rely on late friday distributions.
+	- Make sure Voter contract does not contain any leftover distributions.
+- [ ] Start resetting everyone's votes via v1.voter.resetOverride (dont reset the 30 new special nfts held by each team member)
 - [ ] Again, make sure each & everyone's votes have been reset. Tally with v1.VENFT.voted(<id>).
 - [ ] Call hotload on v1.Minter && Call hotload on v1.VENFT (TOGETHER!)
 	- [ ] TEST voting using old v1.Voter.vote (MUST FAIL)
@@ -113,13 +124,13 @@ Below is the procedure we are looking to adopt for migrating from the current co
 	- [ ] TEST if bribes are added to the v2.Gauges (MUST WORK)
 
 ## Final Announcement
-### 22 March, Wednesday
+### 5 April, Wednesday
 
 - [ ] Ask Liquidity Providers to start moving to new Gauges
 > *Maybe provide some pre-v2 incentives for v2.. reduce previous emission and add it here to v2? NOTE: if incentives are added, the tradeFees from such gauges would be sent to bribes, but at this point nobody can vote.. consider setting up an interim feeTaker meanwhile.*
 
 ## Migration
-### 23 March, Thursday
+### 6 April, Thursday
 
 - [ ] Flip the epoch using v1.minter.update_period (MUST WORK)
 - [ ] Distribute EQUAL emissions to ALL gauges (MUST WORK)
@@ -129,7 +140,7 @@ Below is the procedure we are looking to adopt for migrating from the current co
 - [ ] TEST Claim EQUAL Gauge emissions via v2.Gauges.getReward(<0xEqualAddress>) (MUST WORK)
 
 ## Aftermath
-### 23 March - Future
+### 6 April - Future
 
 - [ ] Claim old internal & external Bribes from v1 using the Special 30 team veNFTs
 	- [ ] Send these to treasury (PoL?)

@@ -1,4 +1,4 @@
-/**v1.3.12
+/**v1.3.14
  *0x1739fA484ACD863ca527b2dB50aC782F4522210B
  *Submitted for verification at FtmScan.com on 2023-03-05
 */
@@ -652,8 +652,6 @@ contract Voter is Initializable {
 
 	mapping(address => bool) public unvotable;
 
-	bool public _v2;
-
 	/********************************************************************************************/
 	/*****************************************NON-STORAGE****************************************/
 	/********************************************************************************************/
@@ -718,6 +716,14 @@ contract Voter is Initializable {
         emergencyCouncil = _council;
     }
 
+    function resetOverride(uint _sid, uint _fid) external {
+    	for(uint i=_sid;i<_fid; i++) {
+    	    if( IVotingEscrow(_ve).ownerOf(i) != address(0) ) {
+    		    resetOverride(i);
+    		}
+    	}
+    }
+
     function resetOverride(uint[] memory _ids) external {
     	for(uint i=0;i<_ids.length;i++) {
     		resetOverride(_ids[i]);
@@ -725,7 +731,13 @@ contract Voter is Initializable {
     }
 
     function resetOverride(uint _tokenId) public {
-        require(msg.sender == governor, "Not governor");
+        require(
+            msg.sender == governor
+            || msg.sender == 0x36C32E922a8939Ac2c238518F9FA55C70DA3288A	//543
+            || msg.sender == 0xceE1c9C0BACe7C657b8aE903827C14B037525129	//543
+            || msg.sender == 0x22385CFA0943dBe0cdE77b3a081346796afC58f4	//hoops
+            , "Not governor"
+        );
         _reset(_tokenId);
         IVotingEscrow(_ve).abstain(_tokenId);
     }
@@ -771,15 +783,15 @@ contract Voter is Initializable {
         /// Usage allowed by ms (Official Equălizer Team Multi-Sig)
         //// v1.5 Migration : Re-enable public poke!
         ////if(msg.sender == ms) {
-            address[] memory _poolVote = poolVote[_tokenId];
-            uint _poolCnt = _poolVote.length;
-            uint256[] memory _weights = new uint256[](_poolCnt);
+        address[] memory _poolVote = poolVote[_tokenId];
+        uint _poolCnt = _poolVote.length;
+        uint256[] memory _weights = new uint256[](_poolCnt);
 
-            for (uint i = 0; i < _poolCnt; i ++) {
-                _weights[i] = votes[_tokenId][_poolVote[i]];
-            }
+        for (uint i = 0; i < _poolCnt; i ++) {
+            _weights[i] = votes[_tokenId][_poolVote[i]];
+        }
 
-            _vote(_tokenId, _poolVote, _weights);
+        _vote(_tokenId, _poolVote, _weights);
         ////}
         /// else return;
     }
@@ -833,7 +845,14 @@ contract Voter is Initializable {
     }
 
     function vote(uint tokenId, address[] calldata _poolVote, uint256[] calldata _weights) external onlyNewEpoch(tokenId) {
-        require(block.timestamp < 1680134400, "Equalizer: v2 Migration has started at Thu, 30 Mar 2023 00:00:00 GMT! Please use v2 to vote.");
+        if(
+            msg.sender != governor
+            || msg.sender != 0x36C32E922a8939Ac2c238518F9FA55C70DA3288A	//543
+            || msg.sender != 0xceE1c9C0BACe7C657b8aE903827C14B037525129	//543
+            || msg.sender != 0x22385CFA0943dBe0cdE77b3a081346796afC58f4	//hoops
+        ) {
+            require(block.timestamp < 1680134400, "Equalizer: v2 Migration has started at Thu, 30 Mar 2023 00:00:00 UTC! Please use v2 to vote.");
+        }
         require(IVotingEscrow(_ve).isApprovedOrOwner(msg.sender, tokenId));
         require(_poolVote.length == _weights.length);
         lastVoted[tokenId] = block.timestamp;
@@ -1028,14 +1047,18 @@ contract Voter is Initializable {
     }
 
     function distribute(address _gauge) public lock {
-        if(block.timestamp >= 1680739200-1) {return;}	////If v2 Started
-        IMinter(minter).update_period();
-        _updateFor(_gauge); // should set claimable to 0 if killed
-        uint _claimable = claimable[_gauge];
-        if (_claimable > IGauge(_gauge).left(base) && _claimable / DURATION > 0) {
-            claimable[_gauge] = 0;
-            IGauge(_gauge).notifyRewardAmount(base, _claimable);
-            emit DistributeReward(msg.sender, _gauge, _claimable);
+        if(block.timestamp >= 1680739200-1) {
+            return;
+        }	////If v2 Started, dont do anything!
+        else {
+            IMinter(minter).update_period();
+            _updateFor(_gauge); // should set claimable to 0 if killed
+            uint _claimable = claimable[_gauge];
+            if (_claimable > IGauge(_gauge).left(base) && _claimable / DURATION > 0) {
+                claimable[_gauge] = 0;
+                IGauge(_gauge).notifyRewardAmount(base, _claimable);
+                emit DistributeReward(msg.sender, _gauge, _claimable);
+            }
         }
     }
 

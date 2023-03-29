@@ -9,8 +9,8 @@ This new version includes a lot of changes, especially to the way in which Trade
 Contract | Implementation | Proxy
 ---- | ---- | ----
 BribeFactory | 0xc8b6fcb95429eb1bc70863adf9e795719f4b7d79 | 0x58be1f04029ffdccbd34919fe0118cd207d746b0
-GaugeFactory | 0x02eb4ac6b4568c5d09722e82dc7fc4fc143378ba | 0xeb1a19ec6fba3de2abdeeef0cd40d44f65362482
-Voter | 0x14a0b746803ec563be405942259969f9af985c20 | 0x5b30731f72cfab189776d7263b0db92ec8e921cf
+GaugeFactory | 0xf438b2fdf46ea176ebf99ec7852c4699e8e38b1f | 0xeb1a19ec6fba3de2abdeeef0cd40d44f65362482
+Voter        | 0x14a0b746803ec563be405942259969f9af985c20 | 0x5b30731F72cFAb189776d7263b0DB92Ec8E921CF
 
 
 ### Old (v1.3)
@@ -19,7 +19,7 @@ Contract | Implementation | Proxy
 ---- | ---- | ----
 BribeFactory | 0x8868ae6de5e723e6840cdc21370e415bf5123684 | 0x5d4589bba42df0c53bbcb7ec59160de64b9d4308
 GaugeFactory | 0xec42750285e41848c00bf745894e8bc233a264c6 | 0xc8be3d680e31187a94b47119c5b2b095ce2be578
-Voter | 0x1739fa484acd863ca527b2db50ac782f4522210b | 0x4bebEB8188aEF8287f9a7d1E4f01d76cBE060d5b
+Voter        | 0x1739fa484acd863ca527b2db50ac782f4522210b | 0x4bebEB8188aEF8287f9a7d1E4f01d76cBE060d5b
 
 ### Others
 
@@ -146,6 +146,16 @@ Below is the procedure we are looking to adopt for migrating from the current co
 	- [ ] Send these to treasury (PoL?)
 
 
+
+----
+----
+----
+----
+----
+----
+----
+----
+----
 ----
 
 # Dev Roadmap with Checklist
@@ -158,24 +168,33 @@ Below is the procedure we are looking to adopt for migrating from the current co
 - [x] Deploy new Proxy: v2_voter
 - [x] Deploy new Proxy: v2_bribeFactory
 - [x] Deploy new Proxy: v2_gaugeFactory
+
 - [x] v2_voter : Initialize
 - [x] v2_voter : Initial Setup
 - [x] v2_voter : Whitelist Tokens
 - [x] v2_voter : Set Gaugable Tokens
 - [x] v2_voter : Create Gauges
+
 - [x] v2_Gauges: Test deposit/withdraw/notify/claim
 - [x] v2_Bribe: Test notify
+
 - [ ] v1_NFT: Create Special Team NFTs
 - [ ] v1_Voter: Vote ALL Gauges with Special Team NFTs
+
+- [x] Deploy new implementation: v1_voter
 - [ ] v1_Voter: UPGRADE - Re-Enable public poke()
 - [ ] v1_Voter: UPGRADE - Add resetOverride()
 - [ ] v1_Voter: UPGRADE - Block vote() after 1680134400
 - [ ] v1_Voter: UPGRADE - Make distribute() useless at 1680739200-1
+
+- [ ] Deploy new implementation: v1_NFT
 - [ ] v1_NFT: UPGRADE - Add oldVoter variable
 - [ ] v1_NFT: UPGRADE - Add set-OLD-Voter() function (DONT CALL)
 - [ ] v1_NFT: UPGRADE - Add set-NEW-Voter() function (DONT CALL)
 - [ ] v1_NFT: UPGRADE - Allow attach/detach calls from oldVoter||voter
 - [ ] v1_NFT: CALL setOldVoter()
+
+- [ ] Deploy new implementation: v1_minter
 - [ ] v1_Minter: UPGRADE - Add set-Voter() function (DONT CALL)
 
 ## On 30 March

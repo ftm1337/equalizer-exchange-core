@@ -574,7 +574,7 @@ contract GaugeEquivalent is ReentrancyGuard {
         _balances[msg.sender] = _balances[msg.sender].add(amount);
         stake.safeTransferFrom(msg.sender, address(this), amount);
         emit Deposit(msg.sender, amount);
-        _claimFees();
+        //_claimFees();
     }
 
     function depositFor(address _user, uint256 amount) public nonReentrant notPaused updateReward(_user) {
@@ -583,7 +583,7 @@ contract GaugeEquivalent is ReentrancyGuard {
         _balances[_user] = _balances[_user].add(amount);
         stake.safeTransferFrom(msg.sender, address(this), amount);
         emit Deposit(_user, amount);
-        _claimFees();
+        //_claimFees();
     }
 
     function depositAll() external {
@@ -600,7 +600,7 @@ contract GaugeEquivalent is ReentrancyGuard {
         _balances[msg.sender] = _balances[msg.sender].sub(amount);
         stake.safeTransfer(msg.sender, amount);
         emit Withdrawn(msg.sender, amount);
-        _claimFees();
+        //_claimFees();
     }
 
     function withdrawAll() external {

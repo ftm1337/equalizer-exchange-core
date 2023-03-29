@@ -8,6 +8,27 @@
  *Submitted for verification at FtmScan.com on 2022-11-23
 */
 
+
+/**
+ *  EQUALIZER EXCHANGE
+ *  The New Liquidity Hub of Fantom chain!
+ *  https://equalizer.exchange  (Dapp)
+ *  https://discord.gg/MaMhbgHMby   (Community)
+ *
+ *
+ *
+ *  Version: 1.3.15
+ *  Contributors:
+ *   -   Andre Cronje, Solidly.Exchange
+ *   -   Velodrome.finance Team
+ *   -   @smartcoding51
+ *   -   543#3017 (Sam), ftm.guru & Equalizer.exchange
+ *
+ *
+ *	SPDX-License-Identifier: UNLICENSED
+*/
+
+
 // File: contracts/interfaces/IERC20.sol
 
 
@@ -547,6 +568,15 @@ contract Minter is Initializable {
     /// @notice Gauge address for EQUAL/WFTM pair
     address public equalWftmGauge;
 
+    address public constant ms = 0xC424C343554aFd6CD270887D4232765850f5e93F;
+
+
+
+	/********************************************************************************************/
+	/*****************************************NON-STORAGE****************************************/
+	/********************************************************************************************/
+	/// NON-STORAGE
+
     event Mint(
         address indexed sender,
         uint weekly,
@@ -718,12 +748,15 @@ contract Minter is Initializable {
         emit Withdrawal(_recipient, remaining);
     }
 
-    address public constant ms = 0xC424C343554aFd6CD270887D4232765850f5e93F;
-
     function reset() external {
-    	require(msg.sender == ms, "!ms");
-    	team = ms;
-    	pendingTeam = ms;
-    	treasury = ms;
+        require(msg.sender == ms, "!ms");
+        team = ms;
+        pendingTeam = ms;
+        treasury = ms;
+    }
+
+    function setNewVoter() external  {
+        require(msg.sender == ms, "!ms");
+        _voter = IVoter(0x5b30731F72cFAb189776d7263b0DB92Ec8E921CF);
     }
 }

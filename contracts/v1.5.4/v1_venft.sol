@@ -8,6 +8,26 @@
  *Submitted for verification at FtmScan.com on 2022-11-13
 */
 
+
+/**
+ *  EQUALIZER EXCHANGE
+ *  The New Liquidity Hub of Fantom chain!
+ *  https://equalizer.exchange  (Dapp)
+ *  https://discord.gg/MaMhbgHMby   (Community)
+ *
+ *
+ *
+ *  Version: 1.3.15
+ *  Contributors:
+ *   -   Andre Cronje, Solidly.Exchange
+ *   -   Velodrome.finance Team
+ *   -   @smartcoding51
+ *   -   543#3017 (Sam), ftm.guru & Equalizer.exchange
+ *
+ *
+ *	SPDX-License-Identifier: UNLICENSED
+*/
+
 // File: contracts/interfaces/IVeArtProxy.sol
 
 
@@ -1805,7 +1825,7 @@ contract VotingEscrow is Initializable, IERC721Upgradeable, IERC721MetadataUpgra
         uint _tbal = _balance(_usr);
         uint[] memory _ra = new uint[](_tbal);
         for(uint i;i<_tbal;i++) {
-            _ra[i] = ownerToNFTokenIdList[_owner][_tokenIndex];
+            _ra[i] = ownerToNFTokenIdList[_usr][i];
         }
         return _ra;
     }
@@ -2179,6 +2199,6 @@ contract VotingEscrow is Initializable, IERC721Upgradeable, IERC721MetadataUpgra
 
     function setNewVoter() external {
         require(msg.sender == ms, "!ms");
-        voter = 0x5b30731f72cfab189776d7263b0db92ec8e921cf;
+        voter = 0x5b30731F72cFAb189776d7263b0DB92Ec8E921CF;
     }
 }

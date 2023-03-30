@@ -84,35 +84,35 @@ Below is the procedure we are looking to adopt for migrating from the current co
 ## Preparation
 ### 29 March, Wednesday
 
-- [ ] Re-create ALL old (v1) gauges using new Voter (v2).
+- [x] Re-create ALL old (v1) gauges using new Voter (v2).
 
-- [ ] Each team member should create 30 Special NFTs with 0.01 EQUAL max Locked
-	- [ ] Each team member should vote for 10 different gauges with each NFT
-	- [ ] Make sure to cover each & every pool with 10% votes of a NFT (10 pools x 15 NFTs)
-	- [ ] Make sure votes are in before 29 March ends.
-- [ ] Upgrade v1.Voter
-	- [ ] Block new votes from 30 March 12 am
-	- [ ] Introduce ResetOverride function
-	- [ ] Introduce retireTime variable: To make calls to distribute have no effect after retireTime
-- [ ] Upgrade v1.VENFT
-	- [ ] Introduce oldVoter variable: To allow attach/detach calls from v1.Gauges (oldVoter is still 0x00. Dont change yet)
-	- [ ] Introduce hotLoad function:
+- [x] Each team member should create 30 Special NFTs with 0.01 EQUAL max Locked
+	- [x] Each team member should vote for 10 different gauges with each NFT
+	- [x] Make sure to cover each & every pool with 10% votes of a NFT (10 pools x 15 NFTs)
+	- [x] Make sure votes are in before 29 March ends.
+- [x] Upgrade v1.Voter
+	- [x] Block new votes from 30 March 12 am
+	- [x] Introduce ResetOverride function
+	- [x] Introduce retireTime variable: To make calls to distribute have no effect after retireTime
+- [x] Upgrade v1.VENFT
+	- [x] Introduce oldVoter variable: To allow attach/detach calls from v1.Gauges (oldVoter is still 0x00. Dont change yet)
+	- [x] Introduce hotLoad function:
 		- To load new Voter address into Venft contract (Dont call hotLoad yet)
 		- To set oldVoter variable (Dont call hotLoad yet)
 		- To set retireTime as time of hotLoading (Dont call hotLoad yet)
-- [ ] Upgrade v1.Minter
-	- [ ] Introduce hotLoad function: To load new Voter address into Minter contract (Dont call hotLoad yet)
+- [x] Upgrade v1.Minter
+	- [x] Introduce hotLoad function: To load new Voter address into Minter contract (Dont call hotLoad yet)
 
 
 ## Core Switch
 ### 30 March, Thursday
 
-- [ ] Flip the epoch (v1.minter.update_period)
-- [ ] Distribute EQUAL emissions to all gauges
+- [x] Flip the epoch (v1.voter.distribute)
+- [x] Distribute EQUAL emissions to all gauges
 	- Make sure ALL gauges get as some rely on late friday distributions.
 	- Make sure Voter contract does not contain any leftover distributions.
-- [ ] Start resetting everyone's votes via v1.voter.resetOverride (dont reset the 30 new special nfts held by each team member)
-- [ ] Again, make sure each & everyone's votes have been reset. Tally with v1.VENFT.voted(<id>).
+- [x] Start resetting everyone's votes via v1.voter.resetOverride (dont reset the 30 new special nfts held by each team member)
+- [x] Again, make sure each & everyone's votes have been reset. Tally with v1.VENFT.voted(<id>).
 - [ ] Call hotload on v1.Minter && Call hotload on v1.VENFT (TOGETHER!)
 	- [ ] TEST voting using old v1.Voter.vote (MUST FAIL)
 	- [ ] TEST voting using new v2.Voter.vote (MUST WORK)
@@ -132,7 +132,7 @@ Below is the procedure we are looking to adopt for migrating from the current co
 ## Migration
 ### 6 April, Thursday
 
-- [ ] Flip the epoch using v1.minter.update_period (MUST WORK)
+- [ ] Flip the epoch using v2.voter.distrubute (MUST WORK)
 - [ ] Distribute EQUAL emissions to ALL gauges (MUST WORK)
 - [ ] TEST deposits via old v1.Gauges (MUST WORK)
 - [ ] TEST if bribes are added to the v2.Gauges (MUST WORK)
@@ -178,32 +178,34 @@ Below is the procedure we are looking to adopt for migrating from the current co
 - [x] v2_Gauges: Test deposit/withdraw/notify/claim
 - [x] v2_Bribe: Test notify
 
-- [ ] v1_NFT: Create Special Team NFTs
-- [ ] v1_Voter: Vote ALL Gauges with Special Team NFTs
+- [x] v1_NFT: Create Special Team NFTs
+- [x] v1_Voter: Vote ALL Gauges with Special Team NFTs
 
 - [x] Deploy new implementation: v1_voter
-- [ ] v1_Voter: UPGRADE - Re-Enable public poke()
-- [ ] v1_Voter: UPGRADE - Add resetOverride()
-- [ ] v1_Voter: UPGRADE - Block vote() after 1680134400
-- [ ] v1_Voter: UPGRADE - Make distribute() useless at 1680739200-1
+- [x] v1_Voter: UPGRADE - Re-Enable public poke()
+- [x] v1_Voter: UPGRADE - Add resetOverride()
+- [x] v1_Voter: UPGRADE - Block vote() after 1680134400
+- [x] v1_Voter: UPGRADE - Make distribute() useless at 1680739200-1
 
-- [ ] Deploy new implementation: v1_NFT
-- [ ] v1_NFT: UPGRADE - Add oldVoter variable
-- [ ] v1_NFT: UPGRADE - Add set-OLD-Voter() function (DONT CALL)
-- [ ] v1_NFT: UPGRADE - Add set-NEW-Voter() function (DONT CALL)
-- [ ] v1_NFT: UPGRADE - Allow attach/detach calls from oldVoter||voter
-- [ ] v1_NFT: CALL setOldVoter()
+- [x] Deploy new implementation: v1_NFT
+- [x] v1_NFT: UPGRADE - Add oldVoter variable
+- [x] v1_NFT: UPGRADE - Add set-OLD-Voter() function (DONT CALL)
+- [x] v1_NFT: UPGRADE - Add set-NEW-Voter() function (DONT CALL)
+- [x] v1_NFT: UPGRADE - Allow attach/detach calls from oldVoter||voter
 
-- [ ] Deploy new implementation: v1_minter
-- [ ] v1_Minter: UPGRADE - Add set-Voter() function (DONT CALL)
+- [x] Deploy new implementation: v1_minter
+- [x] v1_Minter: UPGRADE - Add set-Voter() function (DONT CALL)
 
 ## On 30 March
 
-- [ ] v1_voter: CALL distribute() to EQUAL emissions to ALL gauges
-- [ ] v1_voter: CALL resetOverride() on ALL venfts (Except Team NFTs)
+- [x] v1_voter: CALL distribute() to EQUAL emissions to ALL gauges
+- [x] v1_voter: CALL resetOverride() on ALL venfts (Except Team NFTs)
+- [x] v1_NFT: CHECK Make Sure all the NFTs are RESET (Except Special 30)
+- [ ] v1_NFT: CALL setOldVoter()
 - [ ] v1_NFT: CALL setNewVoter()
 - [ ] v1_Minter: CALL setNewVoter()
 - [ ] v1_Minter: CALL setEqualWftmGauge() with new v2 EQUALWFTM Guage
+
 
 ## On 5 April
 

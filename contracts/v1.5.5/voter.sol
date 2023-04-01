@@ -1,65 +1,72 @@
-/**v1.3.15
- *0xb13d321AD89413239E0D0a97fE9823315D068495
- *Submitted for verification at FtmScan.com on 2023-03-05
+/**
+ *v1.5.1
+ *0xEdFA7461bA8Eb8164E5625D75EE8Ea9839772F64
+ *Submitted for verification at FtmScan.com on 2023-03-18
 */
-
-/**v1.3.14
- *0x1739fA484ACD863ca527b2dB50aC782F4522210B
- *Submitted for verification at FtmScan.com on 2023-03-05
+/**
+ *v1.5.0
+ *0x626ecdd835B508f1d9D156015490B6CcBC9E3e90
+ *Submitted for verification at FtmScan.com on 2023-03-17
 */
-
-/**v1.3.11
- *0x40271D884450c404D6323d0C41C9bc5Fbf394a0C
+/**
+ *v1.4.4
+ *0xC45f2AFEb6E34488cf8987F0458Ab3f93C8D49BF
+ *Submitted for verification at FtmScan.com on 2023-03-09
+*/
+/**
+ *v1.4.3
+ *0xDFf9bA0A6361EF588398aE5631B0055169e2F072
+ *Submitted for verification at FtmScan.com on 2023-03-09
+*/
+/**
+ *v1.4.2
+ *0xB99c82191Ee5Dc240bd2a77827413574075ed2F6
+ *Submitted for verification at FtmScan.com on 2023-03-06
+*/
+/**
+ *v1.4.1
+ *0xFE363d3DE8a0beA47cC7d7f5c096D3852AdbC396
  *Submitted for verification at FtmScan.com on 2023-02-22
 */
-
 /**
  *v1.3.10
  *0x2f2c3a2ee4f63640a044e8a7fd01102c7aaf5186
  *Submitted for verification at FtmScan.com on 2023-02-12
 */
-
 /**
  *v1.3.9
  *0x81377455214496CA22d9658eFAEFddd83775Aac3
  *Submitted for verification at FtmScan.com on 2023-02-11
 */
-
 /**
  *v1.3.7
  *0x0A6e8D4d8685F80374FD88f08AbbCA5F5DdE9D4F
  *Submitted for verification at FtmScan.com on 2023-01-29
 */
-
 /**
  *v1.3.5
  *0xb333bb146b29d6caa078905f551679137aabd0c5
  *Submitted for verification at FtmScan.com on 2023-01-18
 */
-
 /**
  *v1.3.1
  *0x225d1e237b8089734fb15C1C206BbB98415d4B46
  *Submitted for verification at FtmScan.com on 2023-01-03
 */
-
 /**
  *v1.3.0
  *0x95797abf5988479138c783dbcc97db869b373bdb
  *Submitted for verification at FtmScan.com on 2022-12-26
 */
-
 /**
  *v1.2.0
  *0x6bF6A6185afE3cc88707b0b6474F6AFceE59EFED
  *Submitted for verification at FtmScan.com on 2022-11-28
 */
-
 /**v1.1.0
  *0xB171D9126d01E6DDb76Df8dd30e3A0C712f2cF5c
  *Submitted for verification at FtmScan.com on 2022-11-09
 */
-
 
 
 
@@ -70,20 +77,27 @@
  *  https://discord.gg/MaMhbgHMby   (Community)
  *
  *
- *  Version: 1.3.8
- *  - Clarify Fee-Claims are once per veNFT per 7 days per pool
- *  - Real-time Countdown
+ *
+ *  Version: 1.5.0
+ *
+ *  Version: 1.5.0
+ *  - Only `base` as initial `allowedRewards[]`
+ *  - Introduce concept of Gaugable
+ *  - Introduce concept of protocolFeesTaker
+ *
+ *  Version: 1.4.4
+ *  - createGaugeMulti
+ *  - LFG!
  *
  *
  *  Contributors:
  *   -   Andre Cronje, Solidly.Exchange
  *   -   Velodrome.finance Team
  *   -   @smartcoding51
- *   -   Sam 543#3017, Equalizer Team
+ *   -   543#3017 (Sam), ftm.guru & Equalizer.exchange
  *
  *
- *   SPDX-License-Identifier: UNLICENSED
- *
+ *	SPDX-License-Identifier: UNLICENSED
 */
 
 
@@ -133,6 +147,8 @@ pragma solidity 0.8.9;
 
 interface IPairFactory {
     function isPaused() external view returns (bool);
+    function token0() external view returns (address);
+    function token1() external view returns (address);
     function allPairsLength() external view returns (uint);
     function isPair(address pair) external view returns (bool);
     function getFee(bool _stable) external view returns(uint256);
@@ -158,6 +174,7 @@ interface IPair {
     function mint(address to) external returns (uint liquidity);
     function getReserves() external view returns (uint _reserve0, uint _reserve1, uint _blockTimestampLast);
     function getAmountOut(uint, address) external view returns (uint);
+    function stable() external view returns (bool s);
 }
 
 // File: contracts/interfaces/IMinter.sol
@@ -194,7 +211,7 @@ interface IERC20 {
 pragma solidity 0.8.9;
 
 interface IGaugeFactory {
-    function createGauge(address, address, address, address, bool, address[] memory) external returns (address);
+    function createGauge(address _p, address _b, address _v, bool _n, address[] memory _r) external returns (address);
 }
 
 // File: contracts/interfaces/IGauge.sol
@@ -208,6 +225,7 @@ interface IGauge {
     function claimFees() external returns (uint claimed0, uint claimed1);
     function left(address token) external view returns (uint);
     function isForPair() external view returns (bool);
+    function setBribe(address _newbribe) external;
 }
 
 // File: contracts/interfaces/IBribeFactory.sol
@@ -216,8 +234,7 @@ interface IGauge {
 pragma solidity 0.8.9;
 
 interface IBribeFactory {
-    function createInternalBribe(address[] memory) external returns (address);
-    function createExternalBribe(address[] memory) external returns (address);
+    function createBribe(address[] memory) external returns (address);
 }
 
 // File: contracts/interfaces/IBribe.sol
@@ -226,8 +243,8 @@ interface IBribeFactory {
 pragma solidity 0.8.9;
 
 interface IBribe {
-    function _deposit(uint amount, uint tokenId) external;
-    function _withdraw(uint amount, uint tokenId) external;
+    function _deposit(uint amount, uint tokenId, address _vtr, address _onr) external;
+    function _withdraw(uint amount, uint tokenId, address _vtr, address _onr) external;
     function getRewardForOwner(uint tokenId, address[] memory tokens) external;
     function notifyRewardAmount(address token, uint amount) external;
     function left(address token) external view returns (uint);
@@ -614,27 +631,42 @@ abstract contract Initializable {
 
 pragma solidity 0.8.9;
 
+
+
+
+
+
+
+
+
+
+
+
 contract Voter is Initializable {
     /// @dev rewards are released over 7 days
-    uint internal constant DURATION = 7 days;
+    uint public constant DURATION = 7 days;
     /// @dev the ve token that governs these contracts
     address public _ve;
     address public factory; // the PairFactory
-    address internal base;
+    address public base;
     address public gaugefactory;
     address public bribefactory;
     address public minter;
+
+    address public ms; // team-governor-council-treasury multi-sig
     address public governor; // should be set to an IGovernor
     /// @dev credibly neutral party similar to Curve's Emergency DAO
     address public emergencyCouncil;
+
+    address public protocolFeesTaker;
+    uint public protocolFeesPerMillion;
 
     uint public totalWeight; // total voting weight
 
     address[] public pools; // all pools viable for incentives
     mapping(address => address) public gauges; // pool => gauge
     mapping(address => address) public poolForGauge; // gauge => pool
-    mapping(address => address) public internal_bribes; // gauge => internal bribe (only fees)
-    mapping(address => address) public external_bribes; // gauge => external bribe (real bribes)
+    mapping(address => address) public bribes; // gauge => unified bribes
     mapping(address => uint256) public weights; // pool => weight
     mapping(uint => mapping(address => uint256)) public votes; // nft => pool => votes
     mapping(uint => address[]) public poolVote; // nft => pools
@@ -642,38 +674,40 @@ contract Voter is Initializable {
     mapping(uint => uint) public lastVoted; // nft => timestamp of last vote, to ensure one vote per epoch
     mapping(address => bool) public isGauge;
     mapping(address => bool) public isWhitelisted;
-    mapping(address => bool) public isAlive;
+    mapping(address => bool) public isAlive; // killed implies no emission allocation
 
-    /// @dev simple re-entrancy check
-    bool internal _locked;
+    bool internal _locked;	/// @dev simple re-entrancy check
+    uint public index;
 
-    uint internal index;
-    mapping(address => uint) internal supplyIndex;
+    mapping(address => uint) public supplyIndex;
     mapping(address => uint) public claimable;
 
-    address public constant ms = 0xC424C343554aFd6CD270887D4232765850f5e93F;
+    mapping(address => bool) public unvotable; // disable voting for certain pools
+    mapping(address => bool) public gaugable; // enable creation for pools with one of these constituents
+    bool public pokable; // toggle poking
 
-	mapping(uint => mapping(address => uint)) public lastFeesClaimTime; // nft => intBribe => time
+    address[] public whitelistings;
 
-	mapping(address => bool) public unvotable;
+
 
 	/********************************************************************************************/
 	/*****************************************NON-STORAGE****************************************/
 	/********************************************************************************************/
-	/// NON-STORAGE
-    event GaugeCreated(address indexed gauge, address creator, address internal_bribe, address indexed external_bribe, address indexed pool);
+	/// NON-STORAGE: Events
+    event GaugeAndBribeCreated(address indexed pool, address gauge, address bribe, address indexed creator, address[] gaugeRewards, address[] allowedRewards);
     event GaugeKilled(address indexed gauge);
     event GaugeRevived(address indexed gauge);
-    event Voted(address indexed voter, uint tokenId, uint256 weight);
-    event Abstained(uint tokenId, uint256 weight);
-    event Deposit(address indexed lp, address indexed gauge, uint tokenId, uint amount);
-    event Withdraw(address indexed lp, address indexed gauge, uint tokenId, uint amount);
+    event Voted(address indexed pooladdr, address voter, address indexed tokenOwner, uint indexed tokenId, uint256 weight, uint256 ts);
+    event Abstained(uint indexed tokenId, uint256 weight);
+    event Deposit(address indexed lp, address indexed gauge, uint indexed tokenId, uint amount);
+    event Withdraw(address indexed lp, address indexed gauge, uint indexed tokenId, uint amount);
     event NotifyReward(address indexed sender, address indexed reward, uint amount);
     event DistributeReward(address indexed sender, address indexed gauge, uint amount);
-    event Attach(address indexed owner, address indexed gauge, uint tokenId);
-    event Detach(address indexed owner, address indexed gauge, uint tokenId);
-    event Whitelisted(address indexed whitelister, address indexed token);
+    event Attach(address indexed owner, address indexed gauge, uint indexed tokenId);
+    event Detach(address indexed owner, address indexed gauge, uint indexed tokenId);
+    event Whitelisted(address indexed whitelister, address indexed token, bool indexed status);
 
+	/// NON-STORAGE: Modifiers
     modifier lock() {
         require(!_locked, "No re-entrancy");
         _locked = true;
@@ -681,10 +715,11 @@ contract Voter is Initializable {
         _locked = false;
     }
 
+	/// NON-STORAGE: Functions
     function initialize(
         address __ve,
         address _factory,
-        address  _gauges,
+        address _gauges,
         address _bribes
     ) public initializer {
         _ve = __ve;
@@ -695,6 +730,8 @@ contract Voter is Initializable {
         minter = msg.sender;
         governor = msg.sender;
         emergencyCouncil = msg.sender;
+        protocolFeesTaker = msg.sender;
+        ms = msg.sender;
     }
 
     modifier onlyNewEpoch(uint _tokenId) {
@@ -704,7 +741,7 @@ contract Voter is Initializable {
     }
 
     function initialSetup(address[] memory _tokens, address _minter) external {
-        require(msg.sender == minter, "Not minter");
+        require(msg.sender == minter, "Not minter!");
         for (uint i = 0; i < _tokens.length; i++) {
             _whitelist(_tokens[i]);
         }
@@ -712,39 +749,23 @@ contract Voter is Initializable {
     }
 
     function setGovernor(address _governor) public {
-        require(msg.sender == governor, "Not governor");
+        require(msg.sender == governor, "Not governor!");
         governor = _governor;
     }
 
     function setEmergencyCouncil(address _council) public {
-        require(msg.sender == emergencyCouncil, "Not emergency council");
+        require(msg.sender == emergencyCouncil, "Not emergency council!");
         emergencyCouncil = _council;
     }
 
-    function resetOverride(uint _sid, uint _fid) external {
-    	for(uint i=_sid;i<_fid; i++) {
-    	    if( IVotingEscrow(_ve).ownerOf(i) != address(0) ) {
-    		    resetOverride(i);
-    		}
-    	}
+    function setProtocolFeesTaker(address _pft) public {
+        require(msg.sender == governor, "Not Protocol Fees Taker!");
+        protocolFeesTaker = _pft;
     }
 
-    function resetOverride(uint[] memory _ids) external {
-    	for(uint i=0;i<_ids.length;i++) {
-    		resetOverride(_ids[i]);
-    	}
-    }
-
-    function resetOverride(uint _tokenId) public {
-        require(
-            msg.sender == governor
-            || msg.sender == 0x36C32E922a8939Ac2c238518F9FA55C70DA3288A	//543
-            || msg.sender == 0xceE1c9C0BACe7C657b8aE903827C14B037525129	//543
-            || msg.sender == 0x22385CFA0943dBe0cdE77b3a081346796afC58f4	//hoops
-            , "Not governor"
-        );
-        _reset(_tokenId);
-        IVotingEscrow(_ve).abstain(_tokenId);
+    function setProtocolFeesPerMillion(uint _pf) public {
+        require(msg.sender == governor, "Not governor!");
+        protocolFeesPerMillion = _pf;
     }
 
     function reset(uint _tokenId) external onlyNewEpoch(_tokenId) {
@@ -754,10 +775,23 @@ contract Voter is Initializable {
         IVotingEscrow(_ve).abstain(_tokenId);
     }
 
+    function resetOverride(uint[] memory _ids) external {
+    	for(uint i=0;i<_ids.length;i++) {
+    		resetOverride(_ids[i]);
+    	}
+    }
+
+    function resetOverride(uint _tokenId) public {
+        require(msg.sender == governor, "Not governor");
+        _reset(_tokenId);
+        IVotingEscrow(_ve).abstain(_tokenId);
+    }
+
     function _reset(uint _tokenId) internal {
         address[] storage _poolVote = poolVote[_tokenId];
         uint _poolVoteCnt = _poolVote.length;
         uint256 _totalWeight = 0;
+        address _tokenOwner = IVotingEscrow(_ve).ownerOf(_tokenId);
 
         for (uint i = 0; i < _poolVoteCnt; i ++) {
             address _pool = _poolVote[i];
@@ -768,8 +802,7 @@ contract Voter is Initializable {
                 weights[_pool] -= _votes;
                 votes[_tokenId][_pool] -= _votes;
                 if (_votes > 0) {
-                    IBribe(internal_bribes[gauges[_pool]])._withdraw(uint256(_votes), _tokenId);
-                    IBribe(external_bribes[gauges[_pool]])._withdraw(uint256(_votes), _tokenId);
+                    IBribe(bribes[gauges[_pool]])._withdraw(uint256(_votes), _tokenId, msg.sender, _tokenOwner);
                     _totalWeight += _votes;
                 } else {
                     _totalWeight -= _votes;
@@ -785,39 +818,41 @@ contract Voter is Initializable {
     function poke(uint _tokenId) external {
         /// Poke function was depreciated in v1.3.0 due to security reasons.
         /// Its still callable for backwards compatibility, but does nothing.
-        /// Usage allowed by ms (Official Equălizer Team Multi-Sig)
-        //// v1.5 Migration : Re-enable public poke!
-        ////if(msg.sender == ms) {
-        address[] memory _poolVote = poolVote[_tokenId];
-        uint _poolCnt = _poolVote.length;
-        uint256[] memory _weights = new uint256[](_poolCnt);
+        /// Usage allowed by ms (Official Equălizer Team Multi-Sig) or Public when pokable.
+        if(pokable || msg.sender == ms) {
+            address[] memory _poolVote = poolVote[_tokenId];
+            uint _poolCnt = _poolVote.length;
+            uint256[] memory _weights = new uint256[](_poolCnt);
 
-        for (uint i = 0; i < _poolCnt; i ++) {
-            _weights[i] = votes[_tokenId][_poolVote[i]];
+            for (uint i = 0; i < _poolCnt; i ++) {
+                _weights[i] = votes[_tokenId][_poolVote[i]];
+            }
+
+            _vote(_tokenId, _poolVote, _weights);
         }
-
-        _vote(_tokenId, _poolVote, _weights);
-        ////}
         /// else return;
     }
 
     function _vote(uint _tokenId, address[] memory _poolVote, uint256[] memory _weights) internal {
-
     	///v1.3.1 Emergency Upgrade
-    	///Prevent voting for certain pools, which mistakenly got bribed..
+    	///Prevent voting for specific "unvotable" pools
     	for(uint lol=0;lol<_poolVote.length;lol++) {
     		require(
-    			! unvotable [ _poolVote[lol] ],
-    			"Voting for this pool not allowed in this epoch.. sorry :("
+    			! unvotable[ _poolVote[lol] ],
+    			"This pool is unvotable!"
+    		);
+    		require(
+    		    isAlive[ gauges[_poolVote[lol] ] ] ,
+    		    "Cant vote for Killed Gauges!"
     		);
     	}
-
         _reset(_tokenId);
         uint _poolCnt = _poolVote.length;
         uint256 _weight = IVotingEscrow(_ve).balanceOfNFT(_tokenId);
         uint256 _totalVoteWeight = 0;
         uint256 _totalWeight = 0;
         uint256 _usedWeight = 0;
+        address _tokenOwner = IVotingEscrow(_ve).ownerOf(_tokenId);
 
         for (uint i = 0; i < _poolCnt; i++) {
             _totalVoteWeight += _weights[i];
@@ -837,11 +872,10 @@ contract Voter is Initializable {
 
                 weights[_pool] += _poolWeight;
                 votes[_tokenId][_pool] += _poolWeight;
-                IBribe(internal_bribes[_gauge])._deposit(uint256(_poolWeight), _tokenId);
-                IBribe(external_bribes[_gauge])._deposit(uint256(_poolWeight), _tokenId);
+                IBribe(bribes[_gauge])._deposit(uint256(_poolWeight), _tokenId, msg.sender, _tokenOwner);
                 _usedWeight += _poolWeight;
                 _totalWeight += _poolWeight;
-                emit Voted(msg.sender, _tokenId, _poolWeight);
+                emit Voted(_pool, msg.sender, _tokenOwner, _tokenId, _poolWeight, block.timestamp);
             }
         }
         if (_usedWeight > 0) IVotingEscrow(_ve).voting(_tokenId);
@@ -850,14 +884,6 @@ contract Voter is Initializable {
     }
 
     function vote(uint tokenId, address[] calldata _poolVote, uint256[] calldata _weights) external onlyNewEpoch(tokenId) {
-        if(
-            msg.sender != governor
-            || msg.sender != 0x36C32E922a8939Ac2c238518F9FA55C70DA3288A	//543
-            || msg.sender != 0xceE1c9C0BACe7C657b8aE903827C14B037525129	//543
-            || msg.sender != 0x22385CFA0943dBe0cdE77b3a081346796afC58f4	//hoops
-        ) {
-            require(block.timestamp < 1680134400, "Equalizer: v2 Migration has started at Thu, 30 Mar 2023 00:00:00 UTC! Please use v2 to vote.");
-        }
         require(IVotingEscrow(_ve).isApprovedOrOwner(msg.sender, tokenId));
         require(_poolVote.length == _weights.length);
         lastVoted[tokenId] = block.timestamp;
@@ -867,13 +893,13 @@ contract Voter is Initializable {
     function _whitelist(address _token) internal {
         require(!isWhitelisted[_token], "Already whitelisted");
         isWhitelisted[_token] = true;
-        emit Whitelisted(msg.sender, _token);
+        whitelistings.push( _token);
+        emit Whitelisted(msg.sender, _token, true);
     }
 
-    function createGauge(address _pool) external returns (address) {
+    function createGauge(address _pool) public returns (address) {
         require(gauges[_pool] == address(0x0), "exists");
         address[] memory allowedRewards = new address[](3);
-        address[] memory internalRewards = new address[](2);
         bool isPair = IPairFactory(factory).isPair(_pool);
         address tokenA;
         address tokenB;
@@ -882,34 +908,46 @@ contract Voter is Initializable {
             (tokenA, tokenB) = IPair(_pool).tokens();
             allowedRewards[0] = tokenA;
             allowedRewards[1] = tokenB;
-            internalRewards[0] = tokenA;
-            internalRewards[1] = tokenB;
-
             if (base != tokenA && base != tokenB) {
               allowedRewards[2] = base;
             }
+        }
+        else {
+        	allowedRewards[0] = base;
         }
 
         if (msg.sender != governor) { // gov can create for any pool, even non-Equalizer pairs
             require(isPair, "!_pool");
             require(isWhitelisted[tokenA] && isWhitelisted[tokenB], "!whitelisted");
+        	require(gaugable[tokenA] || gaugable[tokenB], "Pool not Gaugable!");
+        	require(IPair(_pool).stable()==false, "Creation of Stable-pool Gauge not allowed!");
         }
 
-        address _internal_bribe = IBribeFactory(bribefactory).createInternalBribe(internalRewards);
-        address _external_bribe = IBribeFactory(bribefactory).createExternalBribe(allowedRewards);
-        address _gauge = IGaugeFactory(gaugefactory).createGauge(_pool, _internal_bribe, _external_bribe, _ve, isPair, allowedRewards);
+        address _bribe = IBribeFactory(bribefactory).createBribe(allowedRewards);
+
+        address[] memory gaugeRewards = new address[](1);
+        gaugeRewards[0] = base;
+        address _gauge = IGaugeFactory(gaugefactory).createGauge(_pool, _bribe, _ve, isPair, gaugeRewards);
+
 
         IERC20(base).approve(_gauge, type(uint).max);
-        internal_bribes[_gauge] = _internal_bribe;
-        external_bribes[_gauge] = _external_bribe;
+        bribes[_gauge] = _bribe;
         gauges[_pool] = _gauge;
         poolForGauge[_gauge] = _pool;
         isGauge[_gauge] = true;
         isAlive[_gauge] = true;
         _updateFor(_gauge);
         pools.push(_pool);
-        emit GaugeCreated(_gauge, msg.sender, _internal_bribe, _external_bribe, _pool);
+        emit GaugeAndBribeCreated(_pool, _gauge, _bribe, msg.sender, gaugeRewards, allowedRewards);
         return _gauge;
+    }
+
+    function createGaugeMultiple(address[] memory _pools) external returns (address[] memory) {
+    	address[] memory _g_c = new address[](_pools.length);
+        for(uint _j; _j<_pools.length; _j++) {
+            _g_c[_j] = createGauge(_pools[_j]);
+        }
+        return _g_c;
     }
 
     function killGauge(address _gauge) external {
@@ -953,6 +991,14 @@ contract Voter is Initializable {
 
     function length() external view returns (uint) {
         return pools.length;
+    }
+
+    function whitelistedTokens() external view returns (address[] memory) {
+    	address[] memory _r = new address[](whitelistings.length);
+    	for(uint i;i<whitelistings.length;i++) {
+    		_r[i] = whitelistings[i];
+    	}
+        return _r;
     }
 
     function notifyRewardAmount(uint amount) external {
@@ -1003,82 +1049,58 @@ contract Voter is Initializable {
         }
     }
 
-    function claimRewards(address[] memory _gauges, address[][] memory _tokens) external {
+    function claimRewards(address[] memory _gauges, address[][] memory _tokens) public {
         for (uint i = 0; i < _gauges.length; i++) {
             IGauge(_gauges[i]).getReward(msg.sender, _tokens[i]);
         }
     }
 
-    function claimBribes(address[] memory _bribes, address[][] memory _tokens, uint _tokenId) external {
+    function claimBribes(address[] memory _bribes, address[][] memory _tokens, uint _tokenId) public {
         require(IVotingEscrow(_ve).isApprovedOrOwner(msg.sender, _tokenId));
         for (uint i = 0; i < _bribes.length; i++) {
             IBribe(_bribes[i]).getRewardForOwner(_tokenId, _tokens[i]);
         }
     }
 
-    function claimFees(address[] memory _fees, address[][] memory _tokens, uint _tokenId) external {
-        require(IVotingEscrow(_ve).isApprovedOrOwner(msg.sender, _tokenId));
-        uint _now = block.timestamp;
-        for (uint i = 0; i < _fees.length; i++) {
-        	require(
-        		_now > lastFeesClaimTime[_tokenId][_fees[i]] + DURATION,
-        		string(
-        			abi.encodePacked(
-        				"Equalizer v1.3.9 : Fees Claim too early!"
-        				" You have to wait 7 days before claiming Trade Fees rewards once again."
-        				" Next claim time for NFT #",
-        				toString(_tokenId),
-        				" is at ",
-        				toString(lastFeesClaimTime[_tokenId][_fees[i]] + DURATION),
-        				". Please check back after ",
-        				timeString(lastFeesClaimTime[_tokenId][_fees[i]] + DURATION),
-        				" The cooldown applies separately & independently on each pool per veNFT."
-        				" Rewards will still keep accumulating."
-        			)
-        		)
-        	);
-        	require(
-        		lastFeesClaimTime[_tokenId][_fees[i]] < 1680000000,
-        		string(
-        			abi.encodePacked(
-        				"Equalizer v1.3.16 : Fees Claims are finished on Equalizer v1."
-        				" Please use Equalizer v2 to continue earning with your veEQUAL NFT #"
-        				, toString(_tokenId)
-        			)
-        		)
-        	);
-            lastFeesClaimTime[_tokenId][_fees[i]] = _now;
-            try IBribe(_fees[i]).getRewardForOwner(_tokenId, _tokens[i]) { }
-            catch {require(false, "Equalizer v1.3.9 : Fees Claim expired! Please try again in the next epoch.");}
+    function claimEverything(
+    	address[] memory _gauges, address[][] memory _gtokens,
+    	address[] memory _bribes, address[][] memory _btokens, uint _tokenId
+    ) external {
+        claimRewards(_gauges, _gtokens);
+        if(_tokenId > 0) {
+            claimBribes(_bribes, _btokens, _tokenId);
         }
+    }
+
+    function distributeFees(address _gauge) external {
+        IGauge(_gauge).claimFees();
     }
 
     function distributeFees(address[] memory _gauges) external {
         for (uint i = 0; i < _gauges.length; i++) {
-            if (IGauge(_gauges[i]).isForPair()) {
-                IGauge(_gauges[i]).claimFees();
-            }
+            IGauge(_gauges[i]).claimFees();
         }
+    }
+
+    function distributeFees(uint start, uint finish) public {
+        for (uint x = start; x < finish; x++) {
+            IGauge(gauges[pools[x]]).claimFees();
+        }
+    }
+
+    function distributeFees() external {
+        distributeFees(0, pools.length);
     }
 
     function distribute(address _gauge) public lock {
-        if(block.timestamp >= 1680739200-1) {
-            return;
-        }	////If v2 Started, dont do anything!
-        else {
-            IMinter(minter).update_period();
-            _updateFor(_gauge); // should set claimable to 0 if killed
-            uint _claimable = claimable[_gauge];
-            if (_claimable > IGauge(_gauge).left(base) && _claimable / DURATION > 0) {
-                claimable[_gauge] = 0;
-                IGauge(_gauge).notifyRewardAmount(base, _claimable);
-                emit DistributeReward(msg.sender, _gauge, _claimable);
-            }
+        IMinter(minter).update_period();
+        _updateFor(_gauge); // should set claimable to 0 if killed
+        uint _claimable = claimable[_gauge];
+        if (_claimable > IGauge(_gauge).left(base) && _claimable / DURATION > 0) {
+            claimable[_gauge] = 0;
+            IGauge(_gauge).notifyRewardAmount(base, _claimable);
+            emit DistributeReward(msg.sender, _gauge, _claimable);
         }
-    }
-
-    function distro() external {
-        distribute(0, pools.length);
     }
 
     function distribute() external {
@@ -1115,50 +1137,51 @@ contract Voter is Initializable {
         require(msg.sender == governor, "Not governor");
         for (uint i = 0; i < _tokens.length; i++) {
             delete isWhitelisted[_tokens[i]];
+            for(uint j; j<whitelistings.length;j++){
+            	if(whitelistings[j]==_tokens[i]){
+            		whitelistings[i] = whitelistings[whitelistings.length-1];
+            		whitelistings.pop();
+            	}
+            }
+            emit Whitelisted(msg.sender, _tokens[i], false);
         }
     }
 
-    function reset() external {
+    function setGov(address _ms) external {
     	require(msg.sender == ms, "!ms");
-    	governor = ms;
-        emergencyCouncil = ms;
+    	governor = _ms;
+        emergencyCouncil = _ms;
+        protocolFeesTaker = _ms;
+        ms = _ms;
     }
 
-    function setUnvotable(address _pa, bool _s) external {
-        require(msg.sender == ms, "!ms");
-        unvotable[_pa] = _s;
+    function setUnvotablePools(address[] calldata _pools, bool[] calldata _b) external {
+        require(msg.sender == governor, "Not governor");
+        for (uint i = 0; i < _pools.length; i++) {
+            unvotable [ _pools[i] ] = _b[i];
+        }
     }
 
-	/********************************************************************************************/
-	/******************************************* [ UTILS ] **************************************/
-	/********************************************************************************************/
+    function setGaugable(address[] calldata _pools, bool[] calldata _b) external {
+        require(msg.sender == governor, "Not governor");
+        for (uint i = 0; i < _pools.length; i++) {
+            gaugable[ _pools[i] ] = _b[i];
+        }
+    }
 
-    /// Utils - these dont touch storage : internal pure view
-    function toString(uint value) internal pure returns (string memory) {
-		if (value == 0) {
-			return "0";
-		}
-		uint temp = value;
-		uint digits;
-		while (temp != 0) {
-			digits++;
-			temp /= 10;
-		}
-		bytes memory buffer = new bytes(digits);
-		while (value != 0) {
-			digits -= 1;
-			buffer[digits] = bytes1(uint8(48 + uint(value % 10)));
-			value /= 10;
-		}
-		return string(buffer);
-	}
-	function timeString(uint t) internal view returns (string memory output) {
-		if (t > block.timestamp) {
-			uint m = t - block.timestamp;
-			return string(abi.encodePacked( toString((m % 1 weeks) / 1 days), ' days, ', toString((m % 1 days) / 1 hours), ' hours, ', toString((m % 1 hours) / 1 minutes), ' minutes & ', toString((m % 1 minutes) / 1 seconds), ' seconds.'));
-		}
-		else {
-			return 'Right now!';
-		}
-	}
+    function setPokable(bool _b) external {
+        require(msg.sender == governor, "Not governor");
+        pokable = _b;
+    }
+
+    ///must be called only after all user votes are reset or when nobody is voting!
+    function setBribe(address _pool, address _nb) external {
+        require(msg.sender == governor, "Not governor");
+        address _g = gauges[_pool];
+        address _ob = bribes [_g];
+        require( IERC20(_ob).totalSupply() == 0 , "Cannot switch bribes which have active deposits!" );
+        IGauge(_g).setBribe(_nb);
+        bribes [_g] = _nb;
+    }
+
 }
